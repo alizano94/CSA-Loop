@@ -1,23 +1,60 @@
 import numpy as np
+
+
 from Utils.Helpers import Helpers
-from CNN.RunCNN import CNN
+from CNN.CNN import *
+from SNN.SNN import *
 
-step = 2
-x = np.arange(1,20)
-load_path = './SavedModels/'
-
-ds = Helpers()
+#Load necesary modules
+aux = Helpers()
 img_class = CNN()
+trayectory = SNN()
 
-#dsX, dsY = ds.convertToMatrix(x,step)
+#Define variables
+cnn_ds_path = './CNN/DS'
+snn_ds_path = './SNN/DS'
+save_model_path = './SavedModels/'
+cnn_weights_name = 'CNN'
+snn_weights_name = 'SNN'
+step = 1
 
-#print("The x values are: \n", dsX)
-#print("The y values are: \n", dsY)
+#Create the models
+cnn_model = img_class.createCNN()
+snn_model = trayectory.createSNN(step)
 
+
+#Train the models
+cnn_training_flag = False
+snn_training_flag = False
+
+if cnn_training_flag:
+	img_class.trainCNN(cnn_ds_path,cnn_model)
+	aux.saveWeights(cnn_model,save_model_path,cnn_weights_name)
+
+if snn_training_flag:
+	trayectory.trainSNN(snn_ds_path,snn_model,step)
+	aux.saveWeights(snn_model,save_model_path,snn_weights_name)
+
+#Load weigths
+print('Loading CNN model...')
+load_path_cnn = save_model_path+cnn_weights_name+'.h5'
+aux.loadWeights(load_path_cnn,cnn_model)
+
+print('Loading SNN model...')
+load_path_snn = save_model_path+snn_weights_name+'.h5'
+aux.loadWeights(load_path_snn,snn_model)
+
+
+#Run the CNN to get inital step
 img_path = './test.png'
-img_batch = ds.preProcessImg(img_path)
+img_batch = aux.preProcessImg(img_path)
 
-model = img_class.loadCNN(load_path)
-initial_step = img_class.RunCNN(model,img_batch)
+initial_step, initial_step_label = img_class.runCNN(cnn_model,img_batch)
 
-print(initial_step)
+
+#Get second step
+predicted_series = trayectory.runSNN(snn_model,initial_step)
+#print('The predicted trayectory is: \n', predicted_series)
+
+aux.plotList(second_step,'Time step','State')
+

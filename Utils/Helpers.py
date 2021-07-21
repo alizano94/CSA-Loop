@@ -1,5 +1,8 @@
+import os
+import csv
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
 import tensorflow as tf
 from tensorflow.keras.preprocessing import image
@@ -68,3 +71,52 @@ class Helpers():
 		#Create a batch of images
 		img_batch = np.expand_dims(img_array, axis=0)
 		return img_batch
+
+	def saveWeights(self,model,save_path,name):
+		model.save_weights(os.path.join(save_path, name+'.h5'))
+
+	def loadWeights(self,load_path,model):
+		'''
+		Functions that loads weight for the model
+		args:
+			-load_path: path from which to load weights
+			-model: keras model
+		'''
+		#Load model wieghts
+		model.load_weights(load_path)
+		print("Loaded model from disk")
+
+	def csv2df(self,csvname):
+		'''
+		Function that extracts info from csv 
+		and creates array.
+		'''
+		results = []
+		with open(csvname) as csvfile:
+			reader = csv.reader(csvfile) # change contents to floats
+			headers = next(reader) 
+			for row in reader:
+				results.append(row)
+
+		x = []
+		for i in range(0,len(results)):
+			x.append(float(results[i][1]))
+
+		df = pd.DataFrame(x)
+
+		return df
+
+	def plotList(self,list,x_lab,y_lab,save_path='./out.png'):
+		'''
+		Function that plots elements on a list
+		'''
+		data = np.zeros((2,len(list)))
+		for i in range(len(list)):
+			data[0][i] = float(i)
+			data[1][i] = list[i]
+		plt.figure()
+		plt.xlabel(x_lab)
+		plt.ylabel(y_lab)
+		plt.ylim(-.5,2.5)
+		plt.scatter(data[:][0],data[:][1],s=0.5)
+		plt.savefig(save_path)
