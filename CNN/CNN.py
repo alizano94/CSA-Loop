@@ -19,6 +19,7 @@ from Utils.Helpers import Helpers
 
 
 class CNN():
+
 	def __init__(self):
 		pass
 
@@ -138,6 +139,45 @@ class CNN():
                   xaxis=dict(title='Epoch'),
                   yaxis=dict(title='Percentage'))
 		fig.show()
+
+	def testCNN(self,model,path):
+		'''
+		Function thats test the CNN against its own DS.
+		Return class mtrix as numpy array
+		'''
+		aux = Helpers()
+		out_file = open(path+'error+log.txt',"w+")
+		out_file.write('#file,real_cat,pred_cat\n')
+		sep = '###################'
+		category = ['Fluid', 'Defective', 'Crystal']
+
+
+		train_path = path+'/train/'
+		test_path = path+'/test/'
+		paths = [train_path,test_path]
+		d = len(next(os.walk(train_path))[1])
+		class_mat = np.zeros((d,d))
+
+		for direct in paths:
+			out_file.write(sep+direct+sep+'\n')
+			for entry in os.scandir(direct):
+				if entry.is_dir():
+					cat = int(str(entry.path)[-1])
+					out_file.write(sep+entry.path+sep+'\n')
+					print(cat)
+					for file in os.scandir(entry.path):
+						if (file.path.endswith('.png')) and file.is_file():
+							img_batch = aux.preProcessImg(file.path)
+							pred, dum = self.runCNN(model,img_batch)
+							class_mat[pred][cat] += 1
+							if pred != cat:
+								log = file.path+','+category[cat]+','+dum+'\n'
+								out_file.write(log)
+		out_file.close()
+		return class_mat
+
+
+
 
 	def runCNN(self,model,img_batch):
 		category = ['Fluid', 'Defective', 'Crystal']

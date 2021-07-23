@@ -44,17 +44,27 @@ print('Loading SNN model...')
 load_path_snn = save_model_path+snn_weights_name+'.h5'
 aux.loadWeights(load_path_snn,snn_model)
 
+#Test NN
+cnn_test_flag = True
 
-#Run the CNN to get inital step
-img_path = './test.png'
-img_batch = aux.preProcessImg(img_path)
+if cnn_test_flag:
+	print(img_class.testCNN(cnn_model,cnn_ds_path))
 
-initial_step, initial_step_label = img_class.runCNN(cnn_model,img_batch)
+#Run the loop
+loop_flag = False
+
+if loop_flag:
+	#Run the CNN to get inital step
+	img_path = './test.png'
+	img_batch = aux.preProcessImg(img_path)
+
+	initial_step, initial_step_label = img_class.runCNN(cnn_model,img_batch)
 
 
-#Get second step
-predicted_series = trayectory.runSNN(snn_model,initial_step)
-#print('The predicted trayectory is: \n', predicted_series)
 
-aux.plotList(second_step,'Time step','State')
+	#Get second step
+	predicted_series = trayectory.runSNN(snn_model,initial_step)
+	print('The predicted trayectory is: \n', predicted_series)
+
+	aux.plotList(predicted_series,'Time step','State')
 
