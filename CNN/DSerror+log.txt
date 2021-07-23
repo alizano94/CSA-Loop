@@ -1,13 +1,13 @@
 #file,real_cat,pred_cat
 ###################./CNN/DS/train/###################
 ###################./CNN/DS/train/0###################
+###################./CNN/DS/train/1###################
+./CNN/DS/train/1/xyz13-xba.png,Defective,Crystal
+./CNN/DS/train/1/xyz10-xbs.png,Defective,Crystal
 ###################./CNN/DS/train/2###################
 ./CNN/DS/train/2/xyz100-xac.png,Crystal,Defective
-###################./CNN/DS/train/1###################
-./CNN/DS/train/1/xyz10-xbs.png,Defective,Crystal
-./CNN/DS/train/1/xyz13-xba.png,Defective,Crystal
 ###################./CNN/DS/test/###################
 ###################./CNN/DS/test/0###################
+###################./CNN/DS/test/1###################
 ###################./CNN/DS/test/2###################
 ./CNN/DS/test/2/xyz100-xad.png,Crystal,Defective
-###################./CNN/DS/test/1###################
