@@ -36,16 +36,25 @@ if snn_training_flag:
 	aux.saveWeights(snn_model,save_model_path,snn_weights_name)
 
 #Load weigths
-print('Loading CNN model...')
-load_path_cnn = save_model_path+cnn_weights_name+'.h5'
-aux.loadWeights(load_path_cnn,cnn_model)
+cnn_load_flag = True
+snn_load_flag = False
 
-print('Loading SNN model...')
-load_path_snn = save_model_path+snn_weights_name+'.h5'
-aux.loadWeights(load_path_snn,snn_model)
+if cnn_load_flag:
+	print('Loading CNN model...')
+	load_path_cnn = save_model_path+cnn_weights_name+'.h5'
+	aux.loadWeights(load_path_cnn,cnn_model)
+if snn_load_flag:
+	print('Loading SNN model...')
+	load_path_snn = save_model_path+snn_weights_name+'.h5'
+	aux.loadWeights(load_path_snn,snn_model)
+
+#Create SNN DS
+snn_ds_create_flag = True
+if snn_ds_create_flag:
+	trayectory.createDS(snn_ds_path,cnn_model)
 
 #Test NN
-cnn_test_flag = True
+cnn_test_flag = False
 
 if cnn_test_flag:
 	print(img_class.testCNN(cnn_model,cnn_ds_path))

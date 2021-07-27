@@ -47,7 +47,7 @@ class CNN():
 		model.add(Conv2D(128, 3, padding='same', activation='relu'))
 		model.add(MaxPooling2D())
 		model.add(Dropout(0.2))
-		model.add(Conv2D(128, 3, padding='same', activation='relu'))
+		model.add(Conv2D(256, 3, padding='same', activation='relu'))
 		model.add(MaxPooling2D())
 		model.add(Dropout(0.2))
 		model.add(Flatten())
