@@ -25,7 +25,7 @@ snn_model = trayectory.createSNN(step)
 
 #Train the models
 cnn_training_flag = False
-snn_training_flag = False
+snn_training_flag = True
 
 if cnn_training_flag:
 	img_class.trainCNN(cnn_ds_path,cnn_model)
@@ -37,7 +37,7 @@ if snn_training_flag:
 
 #Load weigths
 cnn_load_flag = True
-snn_load_flag = False
+snn_load_flag = True
 
 if cnn_load_flag:
 	print('Loading CNN model...')
@@ -49,7 +49,7 @@ if snn_load_flag:
 	aux.loadWeights(load_path_snn,snn_model)
 
 #Create SNN DS
-snn_ds_create_flag = True
+snn_ds_create_flag = False
 if snn_ds_create_flag:
 	trayectory.createDS(snn_ds_path,cnn_model)
 
@@ -60,7 +60,7 @@ if cnn_test_flag:
 	print(img_class.testCNN(cnn_model,cnn_ds_path))
 
 #Run the loop
-loop_flag = False
+loop_flag = True
 
 if loop_flag:
 	#Run the CNN to get inital step

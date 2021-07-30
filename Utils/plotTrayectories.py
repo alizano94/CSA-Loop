@@ -19,7 +19,8 @@ for i in range(3,6):
 		trayectory[col_name] = df[0]
 		plt.figure()
 		plt.xlabel('Time step')
-		plt.ylabel('State')
+		plt.yticks([0, 1, 2], ['Fluid', 'Deffective', 'Crystal']
+			,rotation=45)
 		plt.ylim(-.5,2.5)
 		plt.scatter(trayectory.reset_index()['index'],
 			trayectory[col_name],

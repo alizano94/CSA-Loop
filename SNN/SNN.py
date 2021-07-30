@@ -72,7 +72,7 @@ class SNN():
 
 		return model
 
-	def trainSNN(self,PATH,model,step,epochs=3,batch=16):
+	def trainSNN(self,PATH,model,step,epochs=10,batch=16):
 		'''
 		A function that trains a SNN given the model
 		and the PATH of the data set.
