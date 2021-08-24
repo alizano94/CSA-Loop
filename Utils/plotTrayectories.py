@@ -11,8 +11,8 @@ h = Helpers()
 ax = plt.gca()
 trayectory = pd.DataFrame()
 
-for i in range(3,6):
-	for j in range(1,6):
+for i in range(1,5):
+	for j in range(1,2):
 		trayectory_file = str(i)+'V-'+str(j)+'tray.csv'
 		col_name = trayectory_file.replace('.csv','')
 		df = h.csv2df(path+trayectory_file)
