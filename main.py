@@ -57,7 +57,7 @@ if snn_load_flag:
 	aux.loadWeights(load_path_snn,snn_model)
 
 #Create SNN DS
-snn_ds_create_flag = True
+snn_ds_create_flag = False
 if snn_ds_create_flag:
 	trayectory.createDS(snn_ds_path,cnn_model)
 
@@ -76,7 +76,7 @@ if cnn_test_flag:
 		print(np.sum(cat_mat))
 
 #Run the loop
-loop_flag = False
+loop_flag = True
 
 if loop_flag:
 	#Run the CNN to get inital step
@@ -119,7 +119,7 @@ if loop_flag:
 		x.append(inp)
 
 	print('The predicted trayectory is: \n', out)
-	print('For the inputs: \n', x)
+	#print('For the inputs: \n', x)
 
 	aux.plotList(out,'Time step','State')
 

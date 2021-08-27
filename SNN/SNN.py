@@ -2,7 +2,7 @@ import os
 import tensorflow as tf
 import numpy as np
 from keras.models import Sequential
-from keras.layers import Dense, SimpleRNN
+from keras.layers import Dense, SimpleRNN, InputLayer
 import tensorflow_probability as tfp
 from CNN.CNN import *
 
@@ -77,13 +77,14 @@ class SNN():
 		#Create the model
 		#SimpleRNN model 
 		model = Sequential()
-		model.add(Dense(units=32, input_shape=(3,step), activation="relu"))
-		model.add(Dropout(0.2))
-		#model.add(SimpleRNN(units=32, activation="relu"))
-		model.add(tfp.layers.DenseFlipout(16, activation="relu")) #Random kernel and bias layer 
-		model.add(Dropout(0.2))
+		model.add(Dense(16, input_shape=(3,step), activation="relu"))
 		model.add(Flatten())
-		model.add(Dense(512, activation='relu'))
+		#model.add(SimpleRNN(units=16, activation="relu"))
+		model.add(Dropout(0.2))
+		model.add(tfp.layers.DenseFlipout(32, activation="relu")) #Random kernel and bias layer 
+		#model.add(Dropout(0.2))
+		#model.add(Dense(64, activation='relu'))
+		#model.add(Dropout(0.2))
 		model.add(Dense(3, activation='softmax'))
 
 		model.compile(loss='categorical_crossentropy',
