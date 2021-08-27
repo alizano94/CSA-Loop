@@ -33,7 +33,6 @@ class SNN():
 		for volts in os.listdir(imgs_path):
 			#Append Voltage dir to path
 			volt_path = imgs_path+'/'+volts
-			volt_num = int(volts.replace("V",""))
 			for step in os.listdir(volt_path):
 				#Append Trayectory dir to path
 				step_path = volt_path+'/'+step
@@ -48,10 +47,13 @@ class SNN():
 					num_files_dir = len([f for f in os.listdir(file_path)
 						if f.endswith('.png') 
 						and os.path.isfile(os.path.join(file_path, f))])
+					names = os.listdir(file_path+'/')
+					names = sorted(names, key = lambda x : (len(x), x.split("-")[2]))
 					for k in range(0,num_files_dir):
+						volt_num = names[k].split('-')[0]
+						volt_num = int(volt_num.replace("V",""))
 						file_name = file_path+'/'+str(volt_num)+'V-'+str(traj_num)+'tray-'+str(k)+'step'+str(step_num)+'s.png'
 						
-
 						#Classify the image as 0, 1 or 2
 						img_batch = h.preProcessImg(file_name)
 						index, label = img_cls.runCNN(model,img_batch)
@@ -75,24 +77,31 @@ class SNN():
 		#Create the model
 		#SimpleRNN model 
 		model = Sequential()
-		model.add(SimpleRNN(units=32, input_shape=(3,step), activation="relu"))
+		model.add(Dense(units=32, input_shape=(3,step), activation="relu"))
+		model.add(Dropout(0.2))
+		#model.add(SimpleRNN(units=32, activation="relu"))
 		model.add(tfp.layers.DenseFlipout(16, activation="relu")) #Random kernel and bias layer 
-		model.add(Dense(1, activation='softmax'))
+		model.add(Dropout(0.2))
+		model.add(Flatten())
+		model.add(Dense(512, activation='relu'))
+		model.add(Dense(3, activation='softmax'))
 
-		model.compile(loss='mean_squared_error', optimizer='rmsprop',metrics=['accuracy'])
+		model.compile(loss='categorical_crossentropy',
+					 optimizer='adam',metrics=['accuracy'])
 		if summary:
 			model.summary()
 
 		return model
 
-	def trainSNN(self,PATH,model,step,epochs=10,batch=16):
+	def trainSNN(self,PATH,model,step,epochs=10,batch=16,plot=False):
 		'''
 		A function that trains a SNN given the model
 		and the PATH of the data set.
 		'''
 		h = Helpers()
 
-		train_X,train_Y = np.zeros([1,3,step]),np.array([])
+		train_X,train_Y = np.zeros([1,3,step]),np.empty([])
+		#train_X,train_Y = np.zeros([1,3,step]),np.empty([1,3,1])
 
 		
 		for file in os.listdir(PATH):
@@ -102,26 +111,47 @@ class SNN():
 				train_X = np.append(train_X,X,axis=0)
 				train_Y = np.append(train_Y,Y)
 		train_X = np.delete(train_X,(0),axis=0)
-		print(train_X.shape)	
-		
-		test_csv = PATH + '/V4-10s-T3.csv' #define better testing ser=t
-		test_X, test_Y = h.preProcessTens(test_csv,step)
+		train_Y = np.delete(train_Y,(0),axis=0)
+		#print(train_X.shape)
+		#print(train_Y.shape)
+
+		test_Y = np.zeros([train_Y.shape[0],3],dtype=int)
+		#print(test_Y.shape)
+		for index in range(train_Y.shape[0]):
+			test_Y[index,int(train_Y[index])] = 1
+			
 
 
-		history = model.fit(train_X,train_Y,
+		history = model.fit(train_X,test_Y,
 			epochs=epochs,
 			batch_size=batch,
-			verbose=0
+			validation_split=0.1,
+			callbacks = [tf.keras.callbacks.EarlyStopping(
+				monitor='val_loss',
+				min_delta=0.01,
+				patience=7
+				)],
+			verbose=2
 			)
 
-		XtrainScore = model.evaluate(train_X, train_Y, verbose=0)
-		XtestScore = model.evaluate(test_X, test_Y, verbose=0)
-		#print("Training Score")
-		#print(XtrainScore)
-		#print("Testing Score")
-		#print(XtestScore)
+		if plot:
+			#Plot Accuracy, change this to matplotlib
+			fig = go.Figure()
+			fig.add_trace(go.Scatter(x=history.epoch,
+	                         y=history.history['accuracy'],
+	                         mode='lines+markers',
+	                         name='Training accuracy'))
+			fig.add_trace(go.Scatter(x=history.epoch,
+	                         y=history.history['val_accuracy'],
+	                         mode='lines+markers',
+	                         name='Validation accuracy'))
+			fig.update_layout(title='Accuracy',
+	                  xaxis=dict(title='Epoch'),
+	                  yaxis=dict(title='Percentage'))
+			fig.show()
+		
 
-	def runSNN(self,model,init,vol_lvl,time_stamp,step,length=200):
+	def runSNN(self,model,inp):
 		'''
 		Function that runs SNN.
 		Args:
@@ -130,23 +160,29 @@ class SNN():
 		Returns:
 			-out
 		'''
-		inp = [[float(init),
-				time_stamp,
-				vol_lvl]]
-		inp = np.transpose([inp[-1]] * step)
-		inp = np.reshape(inp,(1,3,step))
-		out =[init]
-		for i in range(length):
-			pred = model.predict(inp)
-			out.append(pred[0][0])
-			#print(pred)
-			init = out[-1]
-			time_stamp += 1
-			new = [[init,time_stamp,vol_lvl]]
-			inp = np.append(inp,np.reshape(new,(1,3,1)),axis=2)
-			inp = np.delete(inp,0,axis=2)
-			inp = np.reshape(inp,(1,3,step))
-				
-			
-		out = [round(x) for x in out]
-		return out
+
+		out = model.predict(inp)
+		#x = [inp]
+		#out =[inp[0][0][0]]
+
+		flag = False
+
+		if flag:
+			for i in range(length):
+				pred = model.predict(inp)
+
+				# Find index of maximum value from 2D numpy array
+				result = np.where(pred == np.amax(pred))
+				# zip the 2 arrays to get the exact coordinates
+				listOfCordinates = list(zip(result[0], result[1]))
+				index = listOfCordinates[0][1]
+				out.append(index)
+
+				time_stamp += t_step
+				new = [[out[-1],time_stamp,vol_lvl]]
+				inp = np.append(inp,np.reshape(new,(1,3,1)),axis=2)
+				inp = np.delete(inp,0,axis=2)
+				inp = np.reshape(inp,(1,3,step))
+				x.append(inp)
+		
+		return out#, x

@@ -20,7 +20,6 @@ class Helpers():
 		A function that takes a series of data 
 		and returns the X and Y tensors that serves
 		as DS for the SNN
-
 		args:
 			-data: Numpy type array containing 
 				   the data
@@ -87,8 +86,8 @@ class Helpers():
 		tensor_X = np.delete(tensor_X,(0),axis=0)
 		np.reshape(tensor_X, (tensor_X.shape[0], 3, tensor_X.shape[2]))
 		if print_tensors:
-			print(tensor_X)
-			print(tensor_Y)
+			print(tensor_X.shape)
+			print(tensor_Y.shape)
 
 		return tensor_X, tensor_Y
 

@@ -89,6 +89,7 @@ class CNN():
 			shuffle=True,
 			target_size=(IMG_H, IMG_W),
 			class_mode='categorical')
+		#print(train_data_gen.shape)
 
 		test_data_gen = image_gen.flow_from_directory(
 			#batch_size=batch,
