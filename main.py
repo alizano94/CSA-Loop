@@ -21,8 +21,9 @@ cnn_out_ds_path = './CNN/testDS'
 step = 1
 
 #Create the models
-cnn_model = img_class.createCNN(summary=True)
-snn_model = trayectory.createSNN(step,summary=True)
+cnn_model = img_class.createCNN(summary=False)
+#snn_model = trayectory.createSNN(step,summary=True)
+snn_model = trayectory.createPBNN(step,summary=True)
 
 
 #Train the models
@@ -44,7 +45,7 @@ if snn_training_flag:
 	aux.saveWeights(snn_model,save_model_path,snn_weights_name)
 
 #Load weigths
-cnn_load_flag = True
+cnn_load_flag = False
 snn_load_flag = True
 
 if cnn_load_flag:
@@ -84,7 +85,7 @@ if loop_flag:
 	img_batch = aux.preProcessImg(img_path)
 
 	initial_step, initial_step_label = img_class.runCNN(cnn_model,img_batch)
-	print(initial_step)
+	#print(initial_step)
 
 
 	#Get second step
@@ -92,34 +93,19 @@ if loop_flag:
 	t_step = 10
 	time_stamp = 0
 	length = 100
+	example_dict = {'cat_index': np.array([initial_step]),
+				'V_level':np.array([vol_lvl]),
+				'#time':np.array([time_stamp])}
 
-	inp = [[float(initial_step),
-				time_stamp,
-				vol_lvl]]
-	inp = np.transpose([inp[-1]] * step)
-	inp = np.reshape(inp,(1,3,step))
-	x = [inp]
-	out =[inp[0][0][0]]
 	for i in range(length):
-		pred = trayectory.runSNN(snn_model,inp)
-		print(pred)
-
-		# Find index of maximum value from 2D numpy array
-		result = np.where(pred == np.amax(pred))
-		# zip the 2 arrays to get the exact coordinates
-		listOfCordinates = list(zip(result[0], result[1]))
-		index = listOfCordinates[0][1]
-		out.append(index)
-		init = out[-1]
-		time_stamp += t_step
-		new = [[init,time_stamp,vol_lvl]]
-		inp = np.append(inp,np.reshape(new,(1,3,1)),axis=2)
-		inp = np.delete(inp,0,axis=2)
-		inp = np.reshape(inp,(1,3,step))
-		x.append(inp)
-
-	print('The predicted trayectory is: \n', out)
+		pred = trayectory.runSNN(snn_model,example_dict)
+		print(pred.mean())
+		pred = np.argmax(pred[0])
+		example_dict = {'cat_index': np.array([pred]),
+				'V_level':np.array([vol_lvl])}
+		
+	#print('The predicted trayectory is: \n', out)
 	#print('For the inputs: \n', x)
 
-	aux.plotList(out,'Time step','State')
+	#aux.plotList(out,'Time step','State')
 

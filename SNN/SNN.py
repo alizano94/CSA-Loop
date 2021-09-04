@@ -1,8 +1,10 @@
 import os
-import tensorflow as tf
 import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
 from keras.models import Sequential
-from keras.layers import Dense, SimpleRNN, InputLayer
+from keras.layers import Dense, SimpleRNN, Input
 import tensorflow_probability as tfp
 from CNN.CNN import *
 
@@ -66,6 +68,32 @@ class SNN():
 		            
 
 
+	def prior(self,kernel_size, bias_size, dtype=None):
+	    n = kernel_size + bias_size
+	    prior_model = keras.Sequential(
+	        [
+	            tfp.layers.DistributionLambda(
+	                lambda t: tfp.distributions.MultivariateNormalDiag(
+	                    loc=tf.zeros(n), scale_diag=tf.ones(n)
+	                )
+	            )
+	        ]
+	    )
+	    return prior_model
+
+
+	def posterior(self,kernel_size, bias_size, dtype=None):
+	    n = kernel_size + bias_size
+	    posterior_model = keras.Sequential(
+	        [
+	            tfp.layers.VariableLayer(
+	                tfp.layers.MultivariateNormalTriL.params_size(n), dtype=dtype
+	            ),
+	            tfp.layers.MultivariateNormalTriL(n),
+	        ]
+	    )
+	    return posterior_model
+
 	def createSNN(self,step,summary=False):
 		'''
 		Function that creates and compile the SNN
@@ -73,24 +101,102 @@ class SNN():
 			-step: time memory size
 		returns:
 			-model: stochastic/recurrent model.
-		'''
-		#Create the model
-		#SimpleRNN model 
-		model = Sequential()
-		model.add(Dense(16, input_shape=(3,step), activation="relu"))
-		model.add(Flatten())
-		#model.add(SimpleRNN(units=16, activation="relu"))
-		model.add(Dropout(0.2))
-		model.add(tfp.layers.DenseFlipout(32, activation="relu")) #Random kernel and bias layer 
-		#model.add(Dropout(0.2))
-		#model.add(Dense(64, activation='relu'))
-		#model.add(Dropout(0.2))
-		model.add(Dense(3, activation='softmax'))
+		''' 
 
-		model.compile(loss='categorical_crossentropy',
-					 optimizer='adam',metrics=['accuracy'])
+		hidden_units = [16,32]
+		learning_rate = 0.001
+		FEATURE_NAMES = [
+			'cat_index',
+			'V_level']
+
+		inputs = {}
+		for name in FEATURE_NAMES:
+			inputs[name] = tf.keras.Input(shape=(1,), name=name)
+		
+		features = keras.layers.concatenate(list(inputs.values()))
+		features = layers.BatchNormalization()(features)
+
+		# Create hidden layers with weight uncertainty using the DenseVariational layer.
+		for units in hidden_units:
+			features = tfp.layers.DenseVariational(
+				units=units,
+				make_prior_fn=self.prior,
+				make_posterior_fn=self.posterior,
+				activation="sigmoid",
+				)(features)
+
+		# The output is deterministic: a single point estimate.
+		outputs = layers.Dense(units=3, activation='softmax')(features)
+		model = keras.Model(inputs=inputs, outputs=outputs)
+
+		model.compile(
+			loss='categorical_crossentropy',
+			optimizer=tf.optimizers.Adam(),
+			metrics=['accuracy']
+			)
 		if summary:
 			model.summary()
+			tf.keras.utils.plot_model(
+				model = model,
+				rankdir="TB",
+				dpi=72,
+				show_shapes=True
+				)
+
+		return model
+
+	def createPBNN(self,step,summary=False):
+		'''
+		Function that creates and compile the SNN
+		args:
+			-step: time memory size
+		returns:
+			-model: stochastic/recurrent model.
+		''' 
+
+		def negative_loglikelihood(targets, estimated_distribution):
+			return -estimated_distribution.log_prob(targets)
+
+		hidden_units = [16,32]
+		learning_rate = 0.001
+		FEATURE_NAMES = [
+			'cat_index',
+			'V_level']
+
+		inputs = {}
+		for name in FEATURE_NAMES:
+			inputs[name] = tf.keras.Input(shape=(1,), name=name)
+		
+		features = keras.layers.concatenate(list(inputs.values()))
+		features = layers.BatchNormalization()(features)
+
+		# Create hidden layers with weight uncertainty using the DenseVariational layer.
+		for units in hidden_units:
+			features = tfp.layers.DenseVariational(
+				units=units,
+				make_prior_fn=self.prior,
+				make_posterior_fn=self.posterior,
+				activation="sigmoid",
+				)(features)
+
+		# The output is deterministic: a single point estimate.
+		distribution_params = layers.Dense(units=2)(features)
+		outputs = tfp.layers.IndependentNormal(1)(distribution_params)
+		model = keras.Model(inputs=inputs, outputs=outputs)
+
+		model.compile(
+			loss=negative_loglikelihood,
+			optimizer=keras.optimizers.RMSprop(learning_rate=learning_rate),
+			metrics=['accuracy']
+			)
+		if summary:
+			model.summary()
+			tf.keras.utils.plot_model(
+				model = model,
+				rankdir="TB",
+				dpi=72,
+				show_shapes=True
+				)
 
 		return model
 
@@ -101,29 +207,31 @@ class SNN():
 		'''
 		h = Helpers()
 
-		train_X,train_Y = np.zeros([1,3,step]),np.empty([])
-		#train_X,train_Y = np.zeros([1,3,step]),np.empty([1,3,1])
-
+		train_features = pd.DataFrame()
+		train_labels = pd.DataFrame()
 		
 		for file in os.listdir(PATH):
 			if file.endswith('.csv'):
 				train_csv = PATH+'/'+file
-				X, Y = h.preProcessTens(train_csv,step)
-				train_X = np.append(train_X,X,axis=0)
-				train_Y = np.append(train_Y,Y)
-		train_X = np.delete(train_X,(0),axis=0)
-		train_Y = np.delete(train_Y,(0),axis=0)
-		#print(train_X.shape)
-		#print(train_Y.shape)
+				X, Y = h.preProcessTens(train_csv)
+				train_features = train_features.append(X)
+				train_labels = train_labels.append(Y)
 
-		test_Y = np.zeros([train_Y.shape[0],3],dtype=int)
-		#print(test_Y.shape)
-		for index in range(train_Y.shape[0]):
-			test_Y[index,int(train_Y[index])] = 1
+		print(train_features)
+		print(train_labels)
+
+		train_features_dict = {name: np.array(value)
+					for name, value in train_features.items()}
+
+		train_labels = np.array(train_labels,dtype=float)
+		#train_labels_arr = np.zeros((len(train_labels),3),dtype=int)
+		#for i in range(len(train_labels)):
+		#	train_labels_arr[i,train_labels[i][0]] = 1 
 			
 
 
-		history = model.fit(train_X,test_Y,
+		history = model.fit(train_features_dict,
+			train_labels,
 			epochs=epochs,
 			batch_size=batch,
 			validation_split=0.1,

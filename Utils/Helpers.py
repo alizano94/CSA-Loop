@@ -71,25 +71,23 @@ class Helpers():
 		img_batch = np.expand_dims(img_array, axis=0)
 		return img_batch
 
-	def preProcessTens(self,csv,step,print_tensors=False):
+	def preProcessTens(self,csv,print_tensors=False):
 		'''
 		Function that takes data form csv 
 		and creates a tensor to use as 
 		'''
-		tensor_X,tensor_Y = np.zeros([1,3,step]),np.array([])
-		df = pd.read_csv(csv)
-		array = df[['cat_index','#time','V_level']].to_numpy()
-		array = array.T
-		array = np.append(array,np.transpose([array[:,-1]] * step),axis=1)
-		X,Y = self.convertToMatrix(array,step)
-		tensor_X,tensor_Y = np.concatenate((tensor_X,X),axis=0),np.append(tensor_Y,Y)
-		tensor_X = np.delete(tensor_X,(0),axis=0)
-		np.reshape(tensor_X, (tensor_X.shape[0], 3, tensor_X.shape[2]))
-		if print_tensors:
-			print(tensor_X.shape)
-			print(tensor_Y.shape)
+		dataset = pd.read_csv(csv)
+		train_features = dataset.copy()
+		train_features.drop(train_features.tail(1).index,inplace=True)
+		#train_features.drop(columns=['cat'],inplace=True)
+		train_features.drop(columns=['cat','#time'],inplace=True)
 
-		return tensor_X, tensor_Y
+		train_labels = dataset.copy()
+		train_labels.drop(columns=['cat','V_level','#time'],inplace=True)
+		train_labels.drop(train_labels.head(1).index,inplace=True)
+		
+
+		return train_features, train_labels
 
 	def saveWeights(self,model,save_path,name):
 		model.save_weights(os.path.join(save_path, name+'.h5'))

@@ -61,6 +61,12 @@ class CNN():
 
 		if summary:
 			model.summary()
+			tf.keras.utils.plot_model(
+				model = model,
+				rankdir="TB",
+				dpi=72,
+				show_shapes=True
+				)
 
 		return model 
 
