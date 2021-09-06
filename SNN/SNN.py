@@ -4,7 +4,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 from keras.models import Sequential
-from keras.layers import Dense, SimpleRNN, Input
+from keras.layers import Dense, SimpleRNN, Input, Lambda
 import tensorflow_probability as tfp
 from CNN.CNN import *
 
@@ -94,7 +94,85 @@ class SNN():
 	    )
 	    return posterior_model
 
-	def createSNN(self,step,summary=False):
+	def negative_binomial_layer(self,x):
+		"""
+		Lambda function for generating negative binomial parameters
+		n and p from a Dense(2) output.
+		Assumes tensorflow 2 backend.
+
+		Usage
+		-----
+		outputs = Dense(2)(final_layer)
+		distribution_outputs = Lambda(negative_binomial_layer)(outputs)
+
+		Parameters
+		----------
+		x : tf.Tensor
+		output tensor of Dense layer
+
+		Returns
+		-------
+		out_tensor : tf.Tensor
+		"""
+
+		# Get the number of dimensions of the input
+		num_dims = len(x.get_shape())
+
+		# Separate the parameters
+		n, p = tf.unstack(x, num=2, axis=-1)
+
+		# Add one dimension to make the right shape
+		n = tf.expand_dims(n, -1)
+		p = tf.expand_dims(p, -1)
+
+		# Apply a softplus to make positive
+		n = tf.keras.activations.softplus(n)
+
+		# Apply a sigmoid activation to bound between 0 and 1
+		p = tf.keras.activations.sigmoid(p)
+
+		# Join back together again
+		out_tensor = tf.concat((n, p), axis=num_dims-1)
+
+		return out_tensor
+
+	def negative_binomial_loss(self,y_true, y_pred):
+		"""
+		Negative binomial loss function.
+		Assumes tensorflow backend.
+
+		Parameters
+		----------
+		y_true : tf.Tensor
+			Ground truth values of predicted variable.
+		y_pred : tf.Tensor
+			n and p values of predicted distribution.
+
+		Returns
+		-------
+		nll : tf.Tensor
+			Negative log likelihood.
+		"""
+
+		# Separate the parameters
+		n, p = tf.unstack(y_pred, num=2, axis=-1)
+
+		# Add one dimension to make the right shape
+		n = tf.expand_dims(n, -1)
+		p = tf.expand_dims(p, -1)
+
+		# Calculate the negative log likelihood
+		nll = (
+			tf.math.lgamma(n)
+			+ tf.math.lgamma(y_true + 1)
+			- tf.math.lgamma(n + y_true)
+			- n * tf.math.log(p)
+			- y_true * tf.math.log(1 - p)
+			)
+
+		return nll
+		
+	def createBBNN(self,step,summary=False):
 		'''
 		Function that creates and compile the SNN
 		args:
@@ -102,6 +180,7 @@ class SNN():
 		returns:
 			-model: stochastic/recurrent model.
 		''' 
+
 
 		hidden_units = [16,32]
 		learning_rate = 0.001
@@ -126,12 +205,14 @@ class SNN():
 				)(features)
 
 		# The output is deterministic: a single point estimate.
-		outputs = layers.Dense(units=3, activation='softmax')(features)
-		model = keras.Model(inputs=inputs, outputs=outputs)
+		outputs = layers.Dense(units=2)(features)
+		distribution_params = Lambda(self.negative_binomial_layer)(outputs)
+
+		model = keras.Model(inputs=inputs, outputs=distribution_params)
 
 		model.compile(
-			loss='categorical_crossentropy',
-			optimizer=tf.optimizers.Adam(),
+			loss = self.negative_binomial_loss,
+			optimizer='adam',
 			metrics=['accuracy']
 			)
 		if summary:

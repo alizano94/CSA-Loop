@@ -1,6 +1,7 @@
 import os
 import numpy as np
 
+from scipy.stats import nbinom
 
 from Utils.Helpers import Helpers
 from CNN.CNN import *
@@ -22,13 +23,13 @@ step = 1
 
 #Create the models
 cnn_model = img_class.createCNN(summary=False)
-#snn_model = trayectory.createSNN(step,summary=True)
-snn_model = trayectory.createPBNN(step,summary=True)
+snn_model = trayectory.createBBNN(step,summary=True)
+#snn_model = trayectory.createPBNN(step,summary=True)
 
 
 #Train the models
 cnn_training_flag = False
-snn_training_flag = True
+snn_training_flag = False
 
 if cnn_training_flag:
 	weigth_file = save_model_path+cnn_weights_name+'.h5'
@@ -41,7 +42,7 @@ if snn_training_flag:
 	weigth_file = save_model_path+snn_weights_name+'.h5'
 	if os.path.isfile(weigth_file):
 		os.remove(weigth_file)
-	trayectory.trainSNN(snn_ds_path,snn_model,step,epochs=20)
+	trayectory.trainSNN(snn_ds_path,snn_model,step,epochs=1000)
 	aux.saveWeights(snn_model,save_model_path,snn_weights_name)
 
 #Load weigths
@@ -81,7 +82,7 @@ loop_flag = True
 
 if loop_flag:
 	#Run the CNN to get inital step
-	img_path = './InitialStates/test.png'
+	img_path = './InitialStates/4V-5tray-99step10s.png'
 	img_batch = aux.preProcessImg(img_path)
 
 	initial_step, initial_step_label = img_class.runCNN(cnn_model,img_batch)
@@ -93,19 +94,24 @@ if loop_flag:
 	t_step = 10
 	time_stamp = 0
 	length = 100
+	
+	#example_dict = {'cat_index': np.array([initial_step]),
+	#			'V_level':np.array([vol_lvl]),
+	#			'#time':np.array([time_stamp])}
+
 	example_dict = {'cat_index': np.array([initial_step]),
-				'V_level':np.array([vol_lvl]),
-				'#time':np.array([time_stamp])}
+				'V_level':np.array([vol_lvl])}
 
 	for i in range(length):
-		pred = trayectory.runSNN(snn_model,example_dict)
-		print(pred.mean())
-		pred = np.argmax(pred[0])
-		example_dict = {'cat_index': np.array([pred]),
-				'V_level':np.array([vol_lvl])}
+		pred_params = trayectory.runSNN(snn_model,example_dict)
+		n = pred_params[:,0]; p = pred_params[:,1]
+		y_pred = nbinom.median(n,p)
+		print(y_pred)
+
+	probs = nbinom.pmf(range(10), n, p)
+	print(probs)
 		
-	#print('The predicted trayectory is: \n', out)
-	#print('For the inputs: \n', x)
-
-	#aux.plotList(out,'Time step','State')
-
+		#pred = np.argmax(pred[0])
+		#example_dict = {'cat_index': np.array([pred]),
+		#		'V_level':np.array([vol_lvl])}
+	
