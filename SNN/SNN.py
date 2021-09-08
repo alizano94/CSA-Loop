@@ -171,7 +171,7 @@ class SNN():
 			)
 
 		return nll
-		
+
 	def createBBNN(self,step,summary=False):
 		'''
 		Function that creates and compile the SNN
@@ -196,6 +196,7 @@ class SNN():
 		features = layers.BatchNormalization()(features)
 
 		# Create hidden layers with weight uncertainty using the DenseVariational layer.
+		features = layers.Dense(8, activation='relu')(features)
 		for units in hidden_units:
 			features = tfp.layers.DenseVariational(
 				units=units,
@@ -212,8 +213,7 @@ class SNN():
 
 		model.compile(
 			loss = self.negative_binomial_loss,
-			optimizer='adam',
-			metrics=['accuracy']
+			optimizer='adam'
 			)
 		if summary:
 			model.summary()
@@ -281,7 +281,7 @@ class SNN():
 
 		return model
 
-	def trainSNN(self,PATH,model,step,epochs=10,batch=16,plot=False):
+	def trainSNN(self,PATH,model,step,epochs=10,batch=16,plot=True):
 		'''
 		A function that trains a SNN given the model
 		and the PATH of the data set.
@@ -316,11 +316,6 @@ class SNN():
 			epochs=epochs,
 			batch_size=batch,
 			validation_split=0.1,
-			callbacks = [tf.keras.callbacks.EarlyStopping(
-				monitor='val_loss',
-				min_delta=0.01,
-				patience=7
-				)],
 			verbose=2
 			)
 
@@ -328,16 +323,16 @@ class SNN():
 			#Plot Accuracy, change this to matplotlib
 			fig = go.Figure()
 			fig.add_trace(go.Scatter(x=history.epoch,
-	                         y=history.history['accuracy'],
+	                         y=history.history['loss'],
 	                         mode='lines+markers',
 	                         name='Training accuracy'))
 			fig.add_trace(go.Scatter(x=history.epoch,
-	                         y=history.history['val_accuracy'],
+	                         y=history.history['val_loss'],
 	                         mode='lines+markers',
 	                         name='Validation accuracy'))
-			fig.update_layout(title='Accuracy',
+			fig.update_layout(title='Loss',
 	                  xaxis=dict(title='Epoch'),
-	                  yaxis=dict(title='Percentage'))
+	                  yaxis=dict(title='Loss'))
 			fig.show()
 		
 
