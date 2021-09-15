@@ -74,13 +74,14 @@ class Helpers():
 	def preProcessTens(self,csv,print_tensors=False):
 		'''
 		Function that takes data form csv 
-		and creates a tensor to use as 
+		and creates a pd Data Frame to use as 
 		'''
 		dataset = pd.read_csv(csv)
+		dataset = dataset[dataset.index % 10 == 0]
 		train_features = dataset.copy()
 		train_features.drop(train_features.tail(1).index,inplace=True)
-		#train_features.drop(columns=['cat'],inplace=True)
-		train_features.drop(columns=['cat','#time'],inplace=True)
+		train_features.drop(columns=['cat'],inplace=True)
+		#train_features.drop(columns=['cat','#time'],inplace=True)
 
 		train_labels = dataset.copy()
 		train_labels.drop(columns=['cat','V_level','#time'],inplace=True)

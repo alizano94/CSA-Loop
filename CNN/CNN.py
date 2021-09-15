@@ -189,10 +189,6 @@ class CNN():
 	def runCNN(self,model,img_batch):
 		category = ['Fluid', 'Defective', 'Crystal']
 		prediction = model.predict(img_batch)
+		cat_index = np.argmax(prediction[0])
 
-		# Find index of maximum value from 2D numpy array
-		result = np.where(prediction == np.amax(prediction))
-		# zip the 2 arrays to get the exact coordinates
-		listOfCordinates = list(zip(result[0], result[1]))
-		index = listOfCordinates[0][1]
-		return index, category[index]
+		return cat_index, category[cat_index]

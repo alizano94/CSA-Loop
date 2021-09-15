@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
 from scipy.stats import nbinom
 
@@ -15,7 +16,7 @@ trayectory = SNN()
 
 #Define variables
 cnn_ds_path = './CNN/DS'
-snn_ds_path = './SNN/test-DS/MVR'
+snn_ds_path = './SNN/test-DS/V34'
 #snn_ds_path = './SNN/DS'
 save_model_path = './SavedModels/'
 cnn_weights_name = 'CNN'
@@ -25,8 +26,8 @@ step = 1
 
 #Create the models
 cnn_model = img_class.createCNN(summary=False)
-snn_model = trayectory.createBBNN(step,summary=False)
-#snn_model = trayectory.createPBNN(step,summary=True)
+#snn_model = trayectory.createBBNN(step,summary=False)
+snn_model = trayectory.createCSNN(step,summary=True)
 
 
 #Train the models
@@ -37,19 +38,19 @@ if cnn_training_flag:
 	weigth_file = save_model_path+cnn_weights_name+'.h5'
 	if os.path.isfile(weigth_file):
 		os.remove(weigth_file)
-	img_class.trainCNN(cnn_out_ds_path,cnn_model,epochs=16)
+	img_class.trainCNN(cnn_out_ds_path,cnn_model,epochs=100)
 	aux.saveWeights(cnn_model,save_model_path,cnn_weights_name)
 
 if snn_training_flag:
 	weigth_file = save_model_path+snn_weights_name+'.h5'
 	if os.path.isfile(weigth_file):
 		os.remove(weigth_file)
-	trayectory.trainSNN(snn_ds_path,snn_model,step,epochs=100)
+	trayectory.trainSNN(snn_ds_path,snn_model,step,epochs=20)
 	aux.saveWeights(snn_model,save_model_path,snn_weights_name)
 
 #Load weigths
-cnn_load_flag = False
-snn_load_flag = False
+cnn_load_flag = True
+snn_load_flag = True
 
 if cnn_load_flag:
 	print('Loading CNN model...')
@@ -65,10 +66,13 @@ snn_ds_create_flag = False
 if snn_ds_create_flag:
 	trayectory.createDS(snn_ds_path,cnn_model)
 
+#Testing part.
 #Test NN
 cnn_test_flag = False
 cnn_test_ownDS = True
 cnn_test_outDS = True
+
+snn_test_flag = False
 
 
 if cnn_test_flag:
@@ -79,56 +83,56 @@ if cnn_test_flag:
 		print(cat_mat)
 		print(np.sum(cat_mat))
 
+if snn_test_flag:
+	for t in [0, 100, 1000]:
+		for v in [3,4]:
+			for init in [0,1,2]:
+				initial_state = init
+				vol_lvl = v
+				example_dict = {'cat_index': np.array([initial_state]),
+								'V_level':np.array([vol_lvl]),
+								'#time':np.array([t])}
+
+				pred_dist = trayectory.runSNN(snn_model,example_dict)
+				print('############Input feature################')
+				print(example_dict)
+				print(pred_dist)
+				print(sum(pred_dist[0]))
+
+
 #Main Code: add any functionalities here.
 loop_flag = True
 
 if loop_flag:
+	vol_lvl = 4
+	t_step = 100
+
 	#Run the CNN to get inital step
-	#img_path = './InitialStates/test.png'
-	#img_batch = aux.preProcessImg(img_path)
+	img_path = './InitialStates/test.png'
+	img_batch = aux.preProcessImg(img_path)
 
-	#initial_step, initial_step_label = img_class.runCNN(cnn_model,img_batch)
-	#print(initial_step)
+	S0, S0_cat_label = img_class.runCNN(cnn_model,img_batch)
 
-	snn_ds_path = './SNN/test-DS/V1'
-	#snn_ds_path = './SNN/DS'
-	#Train the models
-	snn_training_flag = True
+	init_feat = {'cat_index': np.array([S0]),
+				 'V_level':np.array([vol_lvl]),
+				 '#time':np.array([0])}
 
-	if snn_training_flag:
-		weigth_file = save_model_path+snn_weights_name+'.h5'
-		if os.path.isfile(weigth_file):
-			os.remove(weigth_file)
-		trayectory.trainSNN(snn_ds_path,snn_model,step,epochs=100)
-		aux.saveWeights(snn_model,save_model_path,snn_weights_name)
+	trajectory = [S0]
+	
+	for i in range(10):
+		#print(init_feat)
+		pred_dist = trayectory.runSNN(snn_model,init_feat)
+		out_state = np.argmax(pred_dist[0])
+		init_feat['cat_index'] = np.array([out_state])
+		init_feat['#time'] = init_feat['#time'] + np.array([t_step])
+		trajectory.append(out_state)
 
-	#Load weigths
-	snn_load_flag = True
+	out_traj = {'step':np.arange(11),
+				'State':np.array(trajectory)}
+	out_traj = pd.DataFrame(out_traj)
+	out_traj.to_csv('./out.csv', sep='\t')
 
-	if snn_load_flag:
-		print('Loading SNN model...')
-		load_path_snn = save_model_path+snn_weights_name+'.h5'
-		aux.loadWeights(load_path_snn,snn_model)
 
-	#Get second step
-	X = range(10)
-	for j in range(4):
-		add = 1
-		vol_lvl = j+add
-		for k in range(3):
-			example_dict = {'cat_index': np.array([k]),
-							'V_level':np.array([vol_lvl])}
 
-			for i in range(10):
-				pred_params = trayectory.runSNN(snn_model,example_dict)
-				n = pred_params[:,0]; p = pred_params[:,1]
-				plt.plot(X, nbinom.pmf(X, n, p), 'o', ms=8)
-			plt.xlabel('State')
-			#plt.title('Binomial probabilities. \nDS: VR\nPrior State: 0\nV_lvl: 4')
-			plt.ylim(bottom=0)
-			plt.xlim([0.0,10.0])
-			fig_name = './Results/Binoms/V'+str(add)+'DS-NTS-V'+str(vol_lvl)+'-IS'+str(k)+'.png'
-			#fig_name = './Results/Binoms/VRDS-NTS-V'+str(vol_lvl)+'-IS'+str(k)+'.png'
-			plt.savefig(fig_name)
-			plt.clf()
-			#plt.show()
+
+	

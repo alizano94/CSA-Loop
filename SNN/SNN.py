@@ -226,7 +226,7 @@ class SNN():
 
 		return model
 
-	def createPBNN(self,step,summary=False):
+	def createCSNN(self,step,summary=False):
 		'''
 		Function that creates and compile the SNN
 		args:
@@ -235,14 +235,12 @@ class SNN():
 			-model: stochastic/recurrent model.
 		''' 
 
-		def negative_loglikelihood(targets, estimated_distribution):
-			return -estimated_distribution.log_prob(targets)
-
 		hidden_units = [16,32]
 		learning_rate = 0.001
 		FEATURE_NAMES = [
 			'cat_index',
-			'V_level']
+			'V_level',
+			'#time']
 
 		inputs = {}
 		for name in FEATURE_NAMES:
@@ -251,7 +249,8 @@ class SNN():
 		features = keras.layers.concatenate(list(inputs.values()))
 		features = layers.BatchNormalization()(features)
 
-		# Create hidden layers with weight uncertainty using the DenseVariational layer.
+		# Create hidden layers with weight uncertainty 
+		#using the DenseVariational layer.
 		for units in hidden_units:
 			features = tfp.layers.DenseVariational(
 				units=units,
@@ -261,14 +260,13 @@ class SNN():
 				)(features)
 
 		# The output is deterministic: a single point estimate.
-		distribution_params = layers.Dense(units=2)(features)
-		outputs = tfp.layers.IndependentNormal(1)(distribution_params)
+		outputs = layers.Dense(3, activation='softmax')(features)
+
 		model = keras.Model(inputs=inputs, outputs=outputs)
 
 		model.compile(
-			loss=negative_loglikelihood,
-			optimizer=keras.optimizers.RMSprop(learning_rate=learning_rate),
-			metrics=['accuracy']
+			loss = 'categorical_crossentropy',
+			optimizer='adam'
 			)
 		if summary:
 			model.summary()
@@ -281,7 +279,7 @@ class SNN():
 
 		return model
 
-	def trainSNN(self,PATH,model,step,epochs=10,batch=16,plot=True):
+	def trainSNN(self,PATH,model,step,epochs=10,batch=16,plot=False):
 		'''
 		A function that trains a SNN given the model
 		and the PATH of the data set.
@@ -305,14 +303,15 @@ class SNN():
 					for name, value in train_features.items()}
 
 		train_labels = np.array(train_labels,dtype=float)
-		#train_labels_arr = np.zeros((len(train_labels),3),dtype=int)
-		#for i in range(len(train_labels)):
-		#	train_labels_arr[i,train_labels[i][0]] = 1 
+		train_labels_arr = np.zeros((len(train_labels),3),dtype=int)
+		for i in range(len(train_labels)):
+			index = int(train_labels[i][0])
+			train_labels_arr[i][index] = 1 
 			
 
 
 		history = model.fit(train_features_dict,
-			train_labels,
+			train_labels_arr,
 			epochs=epochs,
 			batch_size=batch,
 			validation_split=0.1,
