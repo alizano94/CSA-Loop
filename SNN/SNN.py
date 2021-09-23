@@ -238,9 +238,8 @@ class SNN():
 		hidden_units = [16,32]
 		learning_rate = 0.001
 		FEATURE_NAMES = [
-			'cat_index',
-			'V_level',
-			'#time']
+			'Si',
+			'V']
 
 		inputs = {}
 		for name in FEATURE_NAMES:
@@ -285,6 +284,7 @@ class SNN():
 		and the PATH of the data set.
 		'''
 		h = Helpers()
+		window = 10
 
 		train_features = pd.DataFrame()
 		train_labels = pd.DataFrame()
@@ -293,13 +293,26 @@ class SNN():
 			if file.endswith('.csv'):
 				train_csv = PATH+'/'+file
 				X, Y = h.preProcessTens(train_csv)
-				train_features = train_features.append(X)
-				train_labels = train_labels.append(Y)
+				tmp_X = pd.DataFrame(columns=['V','Si'])
+				tmp_Y = pd.DataFrame(columns=['So'])
+				for index, rows in X.iterrows():
+					new_size = len(X) - window
+					if index < new_size:
+						tmp_X = tmp_X.append(
+							{'V': rows['V_level'],
+							'Si':rows['cat_index']
+							},ignore_index=True)
+						tmp_Y = tmp_Y.append(
+							{'So':Y.loc[index+10,'cat_index']
+							},ignore_index=True)
+				train_features = train_features.append(tmp_X)
+				train_labels = train_labels.append(tmp_Y)
 
-		print(train_features)
-		print(train_labels)
+		#print(X)
+		#print(train_features)
+		#print(train_labels)
 
-		train_features_dict = {name: np.array(value)
+		train_features_dict = {name: np.array(value,dtype=float)
 					for name, value in train_features.items()}
 
 		train_labels = np.array(train_labels,dtype=float)
@@ -307,6 +320,7 @@ class SNN():
 		for i in range(len(train_labels)):
 			index = int(train_labels[i][0])
 			train_labels_arr[i][index] = 1 
+		print("DEBUG")
 			
 
 

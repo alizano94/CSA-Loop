@@ -16,7 +16,7 @@ trayectory = SNN()
 
 #Define variables
 cnn_ds_path = './CNN/DS'
-snn_ds_path = './SNN/test-DS/V34'
+snn_ds_path = './SNN/test-DS/MVR'
 #snn_ds_path = './SNN/DS'
 save_model_path = './SavedModels/'
 cnn_weights_name = 'CNN'
@@ -32,7 +32,7 @@ snn_model = trayectory.createCSNN(step,summary=True)
 
 #Train the models
 cnn_training_flag = False
-snn_training_flag = False
+snn_training_flag = True
 
 if cnn_training_flag:
 	weigth_file = save_model_path+cnn_weights_name+'.h5'
@@ -72,7 +72,7 @@ cnn_test_flag = False
 cnn_test_ownDS = True
 cnn_test_outDS = True
 
-snn_test_flag = False
+snn_test_flag = True
 
 
 if cnn_test_flag:
@@ -84,24 +84,23 @@ if cnn_test_flag:
 		print(np.sum(cat_mat))
 
 if snn_test_flag:
-	for t in [0, 100, 1000]:
-		for v in [3,4]:
-			for init in [0,1,2]:
-				initial_state = init
-				vol_lvl = v
-				example_dict = {'cat_index': np.array([initial_state]),
-								'V_level':np.array([vol_lvl]),
-								'#time':np.array([t])}
+	for v in [1,2,3,4]:
+		for init in [0,1,2]:
+			initial_state = init
+			vol_lvl = v
+			example_dict = {'Si': np.array([initial_state]),
+							'V':np.array([vol_lvl])
+							}
 
-				pred_dist = trayectory.runSNN(snn_model,example_dict)
-				print('############Input feature################')
-				print(example_dict)
-				print(pred_dist)
-				print(sum(pred_dist[0]))
+			pred_dist = trayectory.runSNN(snn_model,example_dict)
+			print('############Input feature################')
+			print(example_dict)
+			print(pred_dist)
+			print(sum(pred_dist[0]))
 
 
 #Main Code: add any functionalities here.
-loop_flag = True
+loop_flag = False
 
 if loop_flag:
 	vol_lvl = 4
@@ -113,8 +112,8 @@ if loop_flag:
 
 	S0, S0_cat_label = img_class.runCNN(cnn_model,img_batch)
 
-	init_feat = {'cat_index': np.array([S0]),
-				 'V_level':np.array([vol_lvl]),
+	init_feat = {'Si': np.array([S0]),
+				 'V':np.array([vol_lvl]),
 				 '#time':np.array([0])}
 
 	trajectory = [S0]
@@ -123,12 +122,12 @@ if loop_flag:
 		#print(init_feat)
 		pred_dist = trayectory.runSNN(snn_model,init_feat)
 		out_state = np.argmax(pred_dist[0])
-		init_feat['cat_index'] = np.array([out_state])
+		init_feat['Si'] = np.array([out_state])
 		init_feat['#time'] = init_feat['#time'] + np.array([t_step])
 		trajectory.append(out_state)
 
 	out_traj = {'step':np.arange(11),
-				'State':np.array(trajectory)}
+				'So':np.array(trajectory)}
 	out_traj = pd.DataFrame(out_traj)
 	out_traj.to_csv('./out.csv', sep='\t')
 

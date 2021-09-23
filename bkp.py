@@ -36,7 +36,15 @@ import matplotlib.pyplot as plt
 
 ############################DS Histogram#################################
 
-PATH = './SNN/DS'
+import os
+import pandas as pd
+import numpy as np
+
+from Utils.Helpers import Helpers
+
+aux = Helpers()
+
+PATH = './SNN/test-DS/FDS'
 
 train_features = pd.DataFrame()
 train_labels = pd.DataFrame()
@@ -48,28 +56,76 @@ for file in os.listdir(PATH):
 		train_features = train_features.append(X)
 		train_labels = train_labels.append(Y)
 
+train_features.rename(columns={'cat_index':'Si'},inplace=True)
+train_features.reset_index(inplace=True)
+train_labels.rename(columns={'cat_index':'So'},inplace=True)
+train_labels.reset_index(inplace=True)
+
+
 print(train_features)
 print(train_labels)
 
-train_features = np.array(train_features,dtype=float)
-train_labels = np.array(train_labels,dtype=float)
+dataset = pd.concat([train_features, train_labels.reset_index()],
+					axis=1)
+dataset.drop(columns=['index','level_0'],inplace=True)
 
-labels = ['Fluid','Defective','Crystal']
-values = [[0,0,0],
-		[0,0,0],
-		[0,0,0],
-		[0,0,0]]
+print(dataset)
+
+for v in [1,2,3,4]:
+	for si in [0,1,2]:
+		example_dict = {'Si': np.array([si]),
+		                'V':np.array([v])}
+		c = [0,0,0]
+		for index, row in dataset.iterrows():
+			if row['V_level'] == v and row['Si'] == si:
+				if row['So'] == 0:
+					c[0] += 1
+				elif row['So'] == 1:
+					c[1] += 1
+				else:
+					c[2] += 1
+		#print(example_dict)
+		#print(c)
+		#print(sum(c))
+
+############################DS Histogram#################################
 
 
-for i in range(len(train_labels)):
-	j = int(train_features[i][1]-1)
-	if j == -1:
-		j += 1
-	k = train_labels[i][0]
-	values[j][int(k)] += 1
+import pandas as pd
 
-	S = [0,0,0]
-	for i in [0,1,2]:
-		for j in [0,1,2,3]:
-			S[i] = S[i] + values[j][i]
-	if S[0] != S[2] or S[1] != S[2]:
+csv = './VRand.csv'
+
+window = 10
+
+dataset = pd.read_csv(csv)
+train_features = dataset.copy()
+train_features.drop(train_features.tail(1).index,inplace=True)
+train_features.drop(columns=['cat'],inplace=True)
+#train_features.drop(columns=['cat','#time'],inplace=True)
+train_features.rename(columns={'cat_index':'Si'},inplace=True)
+
+train_labels = dataset.copy()
+train_labels.drop(columns=['cat','V_level','#time'],inplace=True)
+train_labels.drop(train_labels.head(1).index,inplace=True)
+train_labels.rename(columns={'cat_index':'So'},inplace=True)
+
+dataset = pd.concat([train_features, train_labels.reset_index()],
+					axis=1)
+dataset.drop(columns=['index'],inplace=True)
+
+new_train_features = pd.DataFrame(columns=['V','Si'])
+new_train_labels = pd.DataFrame(columns=['So'])
+
+for index, rows in dataset.iterrows():
+	new_size = len(dataset) - window
+	if index < new_size:
+		new_train_features = new_train_features.append(
+			{'V': rows['V_level'],
+			 'Si':rows['Si']
+			},ignore_index=True)
+		new_train_labels = new_train_labels.append(
+			{'So':train_labels.loc[index+10,'So']
+			},ignore_index=True)
+
+print(new_train_features)
+print(new_train_labels)
