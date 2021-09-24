@@ -1,6 +1,8 @@
 import os
 import pandas as pd
 import numpy as np
+from random import seed, randint
+
 
 from Utils.Helpers import Helpers
 
@@ -45,6 +47,30 @@ dataset = pd.concat([train_features, train_labels.reset_index()],
 dataset.drop(columns=['index','level_0'],inplace=True)
 
 print(dataset)
+
+hist = [0,0,0]
+
+for index, rows in dataset.iterrows():
+	hist[rows['So']] += 1
+
+print(hist)
+
+seed(1)
+
+min_hist = min(hist)
+arg_min = np.argmin(hist)
+
+while max(hist) != min_hist:
+	index = randint(0,len(dataset))
+	hist_index = dataset['So'][index]
+	if hist[hist_index] > min_hist:
+ 		dataset.drop(index=index, inplace=True)
+	hist = [0,0,0]
+	for index, rows in dataset.iterrows():
+		hist[rows['So']] += 1
+	dataset.reset_index(inplace=True)
+	dataset.drop(columns=['index'],inplace=True)
+	print(hist)
 
 for v in [1,2,3,4]:
 	for si in [0,1,2]:

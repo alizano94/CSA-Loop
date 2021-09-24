@@ -9,6 +9,7 @@ import tensorflow_probability as tfp
 from CNN.CNN import *
 
 import pandas as pd
+from random import seed, randint
 
 from Utils.Helpers import Helpers
 
@@ -307,20 +308,72 @@ class SNN():
 							},ignore_index=True)
 				train_features = train_features.append(tmp_X)
 				train_labels = train_labels.append(tmp_Y)
+		train_features.reset_index(inplace=True)
+		train_labels.reset_index(inplace=True)
 
-		#print(X)
-		#print(train_features)
-		#print(train_labels)
+		hist = [0,0,0]
+
+		for index, rows in train_labels.iterrows():
+			hist[rows['So']] += 1
+
+		print(hist)
+
+		seed(1)
+
+		min_hist = min(hist)
+		arg_min = np.argmin(hist)
+
+		while max(hist) != min_hist:
+			index = randint(0,len(train_labels))
+			#print(index)
+			hist_index = train_labels['So'][index]
+			if hist[hist_index] > min_hist:
+		 		train_labels.drop(index=index, inplace=True)
+		 		train_features.drop(index=index, inplace=True)
+			hist = [0,0,0]
+			for index, rows in train_labels.iterrows():
+				hist[rows['So']] += 1
+			train_labels.reset_index(inplace=True)
+			train_features.reset_index(inplace=True)
+			train_labels.drop(columns=['index'],inplace=True)
+			train_features.drop(columns=['index'],inplace=True)
+			#print(hist)
+
+		dataset = pd.concat([train_features, train_labels.reset_index()],
+					axis=1)
+		dataset.drop(columns=['index','level_0'],inplace=True)
+
+		for v in [1,2,3,4]:
+			for si in [0,1,2]:
+				example_dict = {'Si': np.array([si]),
+				                'V':np.array([v])}
+				c = [0,0,0]
+				for index, row in dataset.iterrows():
+					if row['V'] == v and row['Si'] == si:
+						if row['So'] == 0:
+							c[0] += 1
+						elif row['So'] == 1:
+							c[1] += 1
+						else:
+							c[2] += 1
+				print(example_dict)
+				print(c)
+				print(sum(c))
+
+		
+		print(train_features)
+		print(train_labels)
 
 		train_features_dict = {name: np.array(value,dtype=float)
 					for name, value in train_features.items()}
 
 		train_labels = np.array(train_labels,dtype=float)
 		train_labels_arr = np.zeros((len(train_labels),3),dtype=int)
+		print(train_labels)
 		for i in range(len(train_labels)):
 			index = int(train_labels[i][0])
+			print(index)
 			train_labels_arr[i][index] = 1 
-		print("DEBUG")
 			
 
 

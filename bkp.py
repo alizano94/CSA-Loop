@@ -129,3 +129,67 @@ for index, rows in dataset.iterrows():
 
 print(new_train_features)
 print(new_train_labels)
+
+
+import pandas as pd
+import numpy as np
+from random import seed, randint
+
+csv = './VRand.csv'
+
+window = 10
+
+dataset = pd.read_csv(csv)
+train_features = dataset.copy()
+train_features.drop(train_features.tail(1).index,inplace=True)
+train_features.drop(columns=['cat'],inplace=True)
+#train_features.drop(columns=['cat','#time'],inplace=True)
+train_features.rename(columns={'cat_index':'Si'},inplace=True)
+
+train_labels = dataset.copy()
+train_labels.drop(columns=['cat','V_level','#time'],inplace=True)
+train_labels.drop(train_labels.head(1).index,inplace=True)
+train_labels.rename(columns={'cat_index':'So'},inplace=True)
+
+dataset = pd.concat([train_features, train_labels.reset_index()],
+					axis=1)
+dataset.drop(columns=['index'],inplace=True)
+
+new_train_features = pd.DataFrame(columns=['V','Si'])
+new_train_labels = pd.DataFrame(columns=['So'])
+
+for index, rows in dataset.iterrows():
+	new_size = len(dataset) - window
+	if index < new_size:
+		new_train_features = new_train_features.append(
+			{'V': rows['V_level'],
+			 'Si':rows['Si']
+			},ignore_index=True)
+		new_train_labels = new_train_labels.append(
+			{'So':train_labels.loc[index+10,'So']
+			},ignore_index=True)
+
+print(new_train_features)
+print(new_train_labels)
+
+hist = [0,0,0]
+
+for index, rows in new_train_labels.iterrows():
+	hist[rows['So']] += 1
+
+seed(1)
+prom = sum(hist)/len(hist)
+
+if prom != min(hist):
+	print('dropping')
+	index = randint(0,len(new_train_labels))
+	element = new_train_labels.loc[[index]]['So']
+	if elemen != np.argmin(hist):
+		new_train_labels.drop([index], inplace=True)
+		new_train_features.drop([index], inplace=True)
+	for index, rows in new_train_labels.iterrows():
+		hist[rows['So']] += 1
+	prom = sum(hist)/len(hist)
+
+print(hist)
+print(prom)
