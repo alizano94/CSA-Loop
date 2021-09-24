@@ -363,6 +363,8 @@ class SNN():
 		
 		print(train_features)
 		print(train_labels)
+		train_labels.drop(columns=['level_0'],inplace=True)
+		train_features.drop(columns=['level_0'],inplace=True)
 
 		train_features_dict = {name: np.array(value,dtype=float)
 					for name, value in train_features.items()}
