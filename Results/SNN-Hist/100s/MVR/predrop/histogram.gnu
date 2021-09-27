@@ -6,7 +6,7 @@
 
 #Set the output file 
 set term png size 1000, 800 enhanced font "Arial,18"
-set style line 1 lc 'red' lt 1 lw 2
+set style line 1 lc 'black' lt 1 lw 2
 set style data histograms
 set style fill solid
 set output ARG2
@@ -22,4 +22,4 @@ unset key
 set ytics nomirror
 set yrange [0:]
 
-plot ARG1 using 0:($2/299):(0.7):xtic(1) w boxes ls 1
+plot ARG1 using 0:2:(0.7):xtic(1) w boxes ls 1

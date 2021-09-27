@@ -320,24 +320,28 @@ class SNN():
 
 		seed(1)
 
-		min_hist = min(hist)
-		arg_min = np.argmin(hist)
+		drop=True
 
-		while max(hist) != min_hist:
-			index = randint(0,len(train_labels))
-			#print(index)
-			hist_index = train_labels['So'][index]
-			if hist[hist_index] > min_hist:
-		 		train_labels.drop(index=index, inplace=True)
-		 		train_features.drop(index=index, inplace=True)
-			hist = [0,0,0]
-			for index, rows in train_labels.iterrows():
-				hist[rows['So']] += 1
-			train_labels.reset_index(inplace=True)
-			train_features.reset_index(inplace=True)
-			train_labels.drop(columns=['index'],inplace=True)
-			train_features.drop(columns=['index'],inplace=True)
-			#print(hist)
+
+		if drop:
+			min_hist = min(hist)
+			arg_min = np.argmin(hist)
+
+			while max(hist) != min_hist:
+				index = randint(0,len(train_labels))
+				#print(index)
+				hist_index = train_labels['So'][index]
+				if hist[hist_index] > min_hist:
+			 		train_labels.drop(index=index, inplace=True)
+			 		train_features.drop(index=index, inplace=True)
+				hist = [0,0,0]
+				for index, rows in train_labels.iterrows():
+					hist[rows['So']] += 1
+				train_labels.reset_index(inplace=True)
+				train_features.reset_index(inplace=True)
+				train_labels.drop(columns=['index'],inplace=True)
+				train_features.drop(columns=['index'],inplace=True)
+			print(hist)
 
 		dataset = pd.concat([train_features, train_labels.reset_index()],
 					axis=1)
@@ -360,7 +364,9 @@ class SNN():
 				print(c)
 				print(sum(c))
 
-		
+		#train_labels.drop(columns=['index'],inplace=True)
+		#train_features.drop(columns=['index'],inplace=True)
+
 		print(train_features)
 		print(train_labels)
 		train_labels.drop(columns=['level_0'],inplace=True)
@@ -374,7 +380,6 @@ class SNN():
 		print(train_labels)
 		for i in range(len(train_labels)):
 			index = int(train_labels[i][0])
-			print(index)
 			train_labels_arr[i][index] = 1 
 			
 

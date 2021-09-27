@@ -32,7 +32,7 @@ snn_model = trayectory.createCSNN(step,summary=True)
 
 #Train the models
 cnn_training_flag = False
-snn_training_flag = True
+snn_training_flag = False
 
 if cnn_training_flag:
 	weigth_file = save_model_path+cnn_weights_name+'.h5'
@@ -72,7 +72,7 @@ cnn_test_flag = False
 cnn_test_ownDS = True
 cnn_test_outDS = True
 
-snn_test_flag = True
+snn_test_flag = False
 
 
 if cnn_test_flag:
@@ -86,10 +86,8 @@ if cnn_test_flag:
 if snn_test_flag:
 	for v in [1,2,3,4]:
 		for init in [0,1,2]:
-			initial_state = init
-			vol_lvl = v
-			example_dict = {'Si': np.array([initial_state]),
-							'V':np.array([vol_lvl])
+			example_dict = {'Si': np.array([init]),
+							'V':np.array([v])
 							}
 
 			pred_dist = trayectory.runSNN(snn_model,example_dict)
@@ -97,6 +95,27 @@ if snn_test_flag:
 			print(example_dict)
 			print(pred_dist)
 			print(sum(pred_dist[0]))
+
+###########Generate transition probabilities############################
+trans_prob = True
+
+if trans_prob:
+	for v in [1,2,3,4]:
+		hist = [0,0,0]
+		for init in [0,1,2]:
+			example_dict = {'Si': np.array([init]),
+							'V':np.array([v])
+							}
+			for i in range(1000):
+				pred_dist = trayectory.runSNN(snn_model,example_dict)
+				hist[np.argmax(pred_dist)] +=1
+			for i in range(3):
+				hist[i] = hist[i]/1000
+			print(example_dict)
+			print(hist)
+			print(sum(hist))
+
+
 
 
 #Main Code: add any functionalities here.

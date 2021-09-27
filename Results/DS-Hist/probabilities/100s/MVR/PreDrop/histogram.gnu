@@ -22,4 +22,4 @@ unset key
 set ytics nomirror
 set yrange [0:]
 
-plot ARG1 using 0:($2/299):(0.7):xtic(1) w boxes ls 1
+plot ARG1 using 0:($2/303):(0.7):xtic(1) w boxes ls 1
