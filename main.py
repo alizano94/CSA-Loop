@@ -31,7 +31,7 @@ step = 1
 cnn_model = img_class.createCNN(summary=False)
 #snn_model = trayectory.createDNN(step,summary=False)
 #snn_model = trayectory.createCSNN(step,summary=True)
-snn_model = trayectory.createDSNN(step,summary=False)
+snn_model = trayectory.createDSNN(step,summary=True)
 
 
 #Train the models

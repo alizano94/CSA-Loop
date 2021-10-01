@@ -216,11 +216,11 @@ class SNN():
 
 		# Create hidden layers with weight uncertainty 
 		#using the DenseVariational layer.
-		for units in [16,32]:
+		for units in [8,16]:
 			features = layers.Dense(units=units,activation="sigmoid")(features)
 			featrues = layers.Dropout(0.2)
 
-		for units in [64,128]:
+		for units in [32,64]:
 			features = tfp.layers.DenseVariational(
 				units=units,
 				make_prior_fn=self.prior,
