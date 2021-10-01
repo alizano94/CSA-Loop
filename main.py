@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from scipy.stats import nbinom
+import tensorflow as tf
+import tensorflow_probability as tfp
+
 
 from Utils.Helpers import Helpers
 from CNN.CNN import *
@@ -26,8 +29,8 @@ step = 1
 
 #Create the models
 cnn_model = img_class.createCNN(summary=False)
-#snn_model = trayectory.createBBNN(step,summary=False)
-snn_model = trayectory.createCSNN(step,summary=True)
+snn_model = trayectory.createDNN(step,summary=False)
+#snn_model = trayectory.createCSNN(step,summary=True)
 
 
 #Train the models
@@ -46,6 +49,7 @@ if snn_training_flag:
 	if os.path.isfile(weigth_file):
 		os.remove(weigth_file)
 	trayectory.trainSNN(snn_ds_path,snn_model,step,epochs=20)
+	#trayectory.trainSNNsingleFeat(snn_ds_path,snn_model,step,epochs=20)
 	aux.saveWeights(snn_model,save_model_path,snn_weights_name)
 
 #Load weigths
@@ -84,6 +88,7 @@ if cnn_test_flag:
 		print(np.sum(cat_mat))
 
 if snn_test_flag:
+	print('Calculating one step transition probabilities...........')
 	for v in [1,2,3,4]:
 		for init in [0,1,2]:
 			example_dict = {'Si': np.array([init]),
@@ -100,20 +105,33 @@ if snn_test_flag:
 trans_prob = True
 
 if trans_prob:
+	n = 500
+	bars = ['Fluid','Defective','Crystal']
+	x_pos = np.arange(len(bars))
+	plt.yticks(color='black')
+	fig_path = './Results/DNN/100s/MVR/Drop/'
+	print('Calculating '+str(n)+' step transition probabilities...........')
 	for v in [1,2,3,4]:
-		hist = [0,0,0]
 		for init in [0,1,2]:
+			plt.xticks(x_pos, bars, color='black')
+			fig_name = fig_path+'MVRDS-L-S'+str(init)+'-V'+str(v)+'.png'
 			example_dict = {'Si': np.array([init]),
-							'V':np.array([v])
-							}
-			for i in range(1000):
-				pred_dist = trayectory.runSNN(snn_model,example_dict)
-				hist[np.argmax(pred_dist)] +=1
-			for i in range(3):
-				hist[i] = hist[i]/1000
+							'V':np.array([v])}
 			print(example_dict)
-			print(hist)
-			print(sum(hist))
+			probs = trayectory.runSNN(snn_model,example_dict)
+			print(probs)
+			cat_dist = tfp.distributions.Categorical(probs=probs[0])
+			empirical_prob = tf.cast(
+					tf.histogram_fixed_width(
+						cat_dist.sample(int(n)),
+										[0, 2],
+										nbins=3
+										),dtype=tf.float32) / n
+			print(empirical_prob)
+			plt.bar(x_pos,empirical_prob,color='black')
+			plt.savefig(fig_name)
+			plt.clf()
+			
 
 
 
@@ -151,6 +169,4 @@ if loop_flag:
 	out_traj.to_csv('./out.csv', sep='\t')
 
 
-
-
-	
+###########################Miscelanious####################################

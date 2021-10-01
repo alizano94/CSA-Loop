@@ -4,7 +4,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 from keras.models import Sequential
-from keras.layers import Dense, SimpleRNN, Input, Lambda
+from keras.layers import Dense, SimpleRNN, Input, Lambda, LSTM
 import tensorflow_probability as tfp
 from CNN.CNN import *
 
@@ -95,137 +95,7 @@ class SNN():
 	    )
 	    return posterior_model
 
-	def negative_binomial_layer(self,x):
-		"""
-		Lambda function for generating negative binomial parameters
-		n and p from a Dense(2) output.
-		Assumes tensorflow 2 backend.
 
-		Usage
-		-----
-		outputs = Dense(2)(final_layer)
-		distribution_outputs = Lambda(negative_binomial_layer)(outputs)
-
-		Parameters
-		----------
-		x : tf.Tensor
-		output tensor of Dense layer
-
-		Returns
-		-------
-		out_tensor : tf.Tensor
-		"""
-
-		# Get the number of dimensions of the input
-		num_dims = len(x.get_shape())
-
-		# Separate the parameters
-		n, p = tf.unstack(x, num=2, axis=-1)
-
-		# Add one dimension to make the right shape
-		n = tf.expand_dims(n, -1)
-		p = tf.expand_dims(p, -1)
-
-		# Apply a softplus to make positive
-		n = tf.keras.activations.softplus(n)
-
-		# Apply a sigmoid activation to bound between 0 and 1
-		p = tf.keras.activations.sigmoid(p)
-
-		# Join back together again
-		out_tensor = tf.concat((n, p), axis=num_dims-1)
-
-		return out_tensor
-
-	def negative_binomial_loss(self,y_true, y_pred):
-		"""
-		Negative binomial loss function.
-		Assumes tensorflow backend.
-
-		Parameters
-		----------
-		y_true : tf.Tensor
-			Ground truth values of predicted variable.
-		y_pred : tf.Tensor
-			n and p values of predicted distribution.
-
-		Returns
-		-------
-		nll : tf.Tensor
-			Negative log likelihood.
-		"""
-
-		# Separate the parameters
-		n, p = tf.unstack(y_pred, num=2, axis=-1)
-
-		# Add one dimension to make the right shape
-		n = tf.expand_dims(n, -1)
-		p = tf.expand_dims(p, -1)
-
-		# Calculate the negative log likelihood
-		nll = (
-			tf.math.lgamma(n)
-			+ tf.math.lgamma(y_true + 1)
-			- tf.math.lgamma(n + y_true)
-			- n * tf.math.log(p)
-			- y_true * tf.math.log(1 - p)
-			)
-
-		return nll
-
-	def createBBNN(self,step,summary=False):
-		'''
-		Function that creates and compile the SNN
-		args:
-			-step: time memory size
-		returns:
-			-model: stochastic/recurrent model.
-		''' 
-
-
-		hidden_units = [16,32]
-		learning_rate = 0.001
-		FEATURE_NAMES = [
-			'cat_index',
-			'V_level']
-
-		inputs = {}
-		for name in FEATURE_NAMES:
-			inputs[name] = tf.keras.Input(shape=(1,), name=name)
-		
-		features = keras.layers.concatenate(list(inputs.values()))
-		features = layers.BatchNormalization()(features)
-
-		# Create hidden layers with weight uncertainty using the DenseVariational layer.
-		features = layers.Dense(8, activation='relu')(features)
-		for units in hidden_units:
-			features = tfp.layers.DenseVariational(
-				units=units,
-				make_prior_fn=self.prior,
-				make_posterior_fn=self.posterior,
-				activation="sigmoid",
-				)(features)
-
-		# The output is deterministic: a single point estimate.
-		outputs = layers.Dense(units=2)(features)
-		distribution_params = Lambda(self.negative_binomial_layer)(outputs)
-
-		model = keras.Model(inputs=inputs, outputs=distribution_params)
-
-		model.compile(
-			loss = self.negative_binomial_loss,
-			optimizer='adam'
-			)
-		if summary:
-			model.summary()
-			tf.keras.utils.plot_model(
-				model = model,
-				rankdir="TB",
-				dpi=72,
-				show_shapes=True
-				)
-
-		return model
 
 	def createCSNN(self,step,summary=False):
 		'''
@@ -236,8 +106,6 @@ class SNN():
 			-model: stochastic/recurrent model.
 		''' 
 
-		hidden_units = [16,32]
-		learning_rate = 0.001
 		FEATURE_NAMES = [
 			'Si',
 			'V']
@@ -251,13 +119,60 @@ class SNN():
 
 		# Create hidden layers with weight uncertainty 
 		#using the DenseVariational layer.
-		for units in hidden_units:
+		for units in [16,32]:
 			features = tfp.layers.DenseVariational(
 				units=units,
 				make_prior_fn=self.prior,
 				make_posterior_fn=self.posterior,
 				activation="sigmoid",
 				)(features)
+			featrues = layers.Dropout(0.2)
+
+		# The output is deterministic: a single point estimate.
+		outputs = layers.Dense(3, activation='softmax')(features)
+
+		model = keras.Model(inputs=inputs, outputs=outputs)
+
+		model.compile(
+			loss = 'categorical_crossentropy',
+			optimizer='adam'
+			)
+		if summary:
+			model.summary()
+			tf.keras.utils.plot_model(
+				model = model,
+				rankdir="TB",
+				dpi=72,
+				show_shapes=True
+				)
+
+		return model
+
+	def createDNN(self,step,summary=False):
+		'''
+		Function that creates and compile the SNN
+		args:
+			-step: time memory size
+		returns:
+			-model: stochastic/recurrent model.
+		''' 
+
+		FEATURE_NAMES = [
+			'Si',
+			'V']
+
+		inputs = {}
+		for name in FEATURE_NAMES:
+			inputs[name] = tf.keras.Input(shape=(1,), name=name)
+		
+		features = keras.layers.concatenate(list(inputs.values()))
+		features = layers.BatchNormalization()(features)
+
+		# Create hidden layers with weight uncertainty 
+		#using the DenseVariational layer.
+		for units in [16,32]:
+			features = layers.Dense(units=units,activation="sigmoid")(features)
+			featrues = layers.Dropout(0.2)
 
 		# The output is deterministic: a single point estimate.
 		outputs = layers.Dense(3, activation='softmax')(features)
@@ -313,17 +228,37 @@ class SNN():
 
 		hist = [0,0,0]
 
-		for index, rows in train_labels.iterrows():
-			hist[rows['So']] += 1
+		for index, rows in train_features.iterrows():
+			hist[rows['Si']] += 1
 
 		print(hist)
 
 		seed(1)
 
-		drop=True
+		drop_Si=True
+		drop_So=False
 
 
-		if drop:
+		if drop_Si:
+			min_hist = min(hist)
+			arg_min = np.argmin(hist)
+
+			while max(hist) != min_hist:
+				index = randint(0,len(train_labels)-1)
+				hist_index = train_features['Si'][index]
+				if hist[hist_index] > min_hist:
+			 		train_labels.drop(index=index, inplace=True)
+			 		train_features.drop(index=index, inplace=True)
+				hist = [0,0,0]
+				for index, rows in train_features.iterrows():
+					hist[rows['Si']] += 1
+				train_labels.reset_index(inplace=True)
+				train_features.reset_index(inplace=True)
+				train_labels.drop(columns=['index'],inplace=True)
+				train_features.drop(columns=['index'],inplace=True)
+			print(hist)
+
+		if drop_So:
 			min_hist = min(hist)
 			arg_min = np.argmin(hist)
 
@@ -407,7 +342,122 @@ class SNN():
 	                  xaxis=dict(title='Epoch'),
 	                  yaxis=dict(title='Loss'))
 			fig.show()
+
+
+	def trainSNNsingleFeat(self,PATH,model,step,epochs=10,batch=16,plot=False):
+		'''
+		A function that trains a SNN given the model
+		and the PATH of the data set.
+		'''
+		h = Helpers()
+		window = 10
+
+		train_features = pd.DataFrame()
+		train_labels = pd.DataFrame()
 		
+		for file in os.listdir(PATH):
+			if file.endswith('.csv'):
+				train_csv = PATH+'/'+file
+				X, Y = h.preProcessTens(train_csv)
+				tmp_X = pd.DataFrame(columns=['V','Si'])
+				tmp_Y = pd.DataFrame(columns=['So'])
+				for index, rows in X.iterrows():
+					new_size = len(X) - window
+					if index < new_size:
+						tmp_X = tmp_X.append(
+							{'V': rows['V_level'],
+							'Si':rows['cat_index']
+							},ignore_index=True)
+						tmp_Y = tmp_Y.append(
+							{'So':Y.loc[index+10,'cat_index']
+							},ignore_index=True)
+				train_features = train_features.append(tmp_X)
+				train_labels = train_labels.append(tmp_Y)
+		train_features.reset_index(inplace=True)
+		train_labels.reset_index(inplace=True)
+
+		hist = [0,0,0]
+
+		index_list = []
+
+		for index, rows in train_features.iterrows():
+			if rows['Si'] != 1 or rows['V'] != 4:
+				index_list.append(index)
+			print(index_list)
+		train_labels.drop(index=index_list, inplace=True)
+		train_features.drop(index=index_list, inplace=True)
+		train_labels.reset_index(inplace=True)
+		train_features.reset_index(inplace=True)
+		train_labels.drop(columns=['index'],inplace=True)
+		train_features.drop(columns=['index'],inplace=True)
+
+		for index, rows in train_labels.iterrows():
+					hist[rows['So']] += 1
+
+		dataset = pd.concat([train_features, train_labels.reset_index()],
+					axis=1)
+		dataset.drop(columns=['index','level_0'],inplace=True)
+
+		for v in [1,2,3,4]:
+			for si in [0,1,2]:
+				example_dict = {'Si': np.array([si]),
+				                'V':np.array([v])}
+				c = [0,0,0]
+				for index, row in dataset.iterrows():
+					if row['V'] == v and row['Si'] == si:
+						if row['So'] == 0:
+							c[0] += 1
+						elif row['So'] == 1:
+							c[1] += 1
+						else:
+							c[2] += 1
+				print(example_dict)
+				print(c)
+				print(sum(c))
+
+		#train_labels.drop(columns=['index'],inplace=True)
+		#train_features.drop(columns=['index'],inplace=True)
+
+		#print(train_features)
+		#print(train_labels)
+		train_labels.drop(columns=['level_0'],inplace=True)
+		train_features.drop(columns=['level_0'],inplace=True)
+
+		train_features_dict = {name: np.array(value,dtype=float)
+					for name, value in train_features.items()}
+
+		train_labels = np.array(train_labels,dtype=float)
+		train_labels_arr = np.zeros((len(train_labels),3),dtype=int)
+		#print(train_labels)
+		for i in range(len(train_labels)):
+			index = int(train_labels[i][0])
+			train_labels_arr[i][index] = 1 
+			
+
+
+		history = model.fit(train_features_dict,
+			train_labels_arr,
+			epochs=epochs,
+			batch_size=batch,
+			validation_split=0.1,
+			verbose=2
+			)
+
+		if plot:
+			#Plot Accuracy, change this to matplotlib
+			fig = go.Figure()
+			fig.add_trace(go.Scatter(x=history.epoch,
+	                         y=history.history['loss'],
+	                         mode='lines+markers',
+	                         name='Training accuracy'))
+			fig.add_trace(go.Scatter(x=history.epoch,
+	                         y=history.history['val_loss'],
+	                         mode='lines+markers',
+	                         name='Validation accuracy'))
+			fig.update_layout(title='Loss',
+	                  xaxis=dict(title='Epoch'),
+	                  yaxis=dict(title='Loss'))
+			fig.show()
 
 	def runSNN(self,model,inp):
 		'''
