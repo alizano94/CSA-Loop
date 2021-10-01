@@ -29,13 +29,14 @@ step = 1
 
 #Create the models
 cnn_model = img_class.createCNN(summary=False)
-snn_model = trayectory.createDNN(step,summary=False)
+#snn_model = trayectory.createDNN(step,summary=False)
 #snn_model = trayectory.createCSNN(step,summary=True)
+snn_model = trayectory.createDSNN(step,summary=False)
 
 
 #Train the models
 cnn_training_flag = False
-snn_training_flag = False
+snn_training_flag = True
 
 if cnn_training_flag:
 	weigth_file = save_model_path+cnn_weights_name+'.h5'
@@ -102,9 +103,9 @@ if snn_test_flag:
 			print(sum(pred_dist[0]))
 
 ###########Generate transition probabilities############################
-trans_prob = True
+trans_prob_DNN = False
 
-if trans_prob:
+if trans_prob_DNN:
 	n = 500
 	bars = ['Fluid','Defective','Crystal']
 	x_pos = np.arange(len(bars))
@@ -127,6 +128,33 @@ if trans_prob:
 										[0, 2],
 										nbins=3
 										),dtype=tf.float32) / n
+			print(empirical_prob)
+			plt.bar(x_pos,empirical_prob,color='black')
+			plt.savefig(fig_name)
+			plt.clf()
+
+###########Generate transition probabilities############################
+trans_prob_SNN = True
+
+if trans_prob_SNN:
+	n = 500
+	bars = ['Fluid','Defective','Crystal']
+	x_pos = np.arange(len(bars))
+	plt.yticks(color='black')
+	fig_path = './Results/DSNN/100s/MVR/Drop'
+	print('Calculating '+str(n)+' step transition probabilities...........')
+	for v in [1,2,3,4]:
+		for init in [0,1,2]:
+			empirical_prob = [0,0,0]
+			plt.xticks(x_pos, bars, color='black')
+			fig_name = fig_path+'MVRDS-L-S'+str(init)+'-V'+str(v)+'.png'
+			example_dict = {'Si': np.array([init]),
+							'V':np.array([v])}
+			print(example_dict)
+			for i in range(n):
+				probs = trayectory.runSNN(snn_model,example_dict)
+				state = np.argmax(probs[0])
+				empirical_prob[state] += 1
 			print(empirical_prob)
 			plt.bar(x_pos,empirical_prob,color='black')
 			plt.savefig(fig_name)

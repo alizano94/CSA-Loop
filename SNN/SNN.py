@@ -194,6 +194,62 @@ class SNN():
 
 		return model
 
+	def createDSNN(self,step,summary=False):
+		'''
+		Function that creates and compile the SNN
+		args:
+			-step: time memory size
+		returns:
+			-model: stochastic/recurrent model.
+		''' 
+
+		FEATURE_NAMES = [
+			'Si',
+			'V']
+
+		inputs = {}
+		for name in FEATURE_NAMES:
+			inputs[name] = tf.keras.Input(shape=(1,), name=name)
+		
+		features = keras.layers.concatenate(list(inputs.values()))
+		features = layers.BatchNormalization()(features)
+
+		# Create hidden layers with weight uncertainty 
+		#using the DenseVariational layer.
+		for units in [16,32]:
+			features = layers.Dense(units=units,activation="sigmoid")(features)
+			featrues = layers.Dropout(0.2)
+
+		for units in [64,128]:
+			features = tfp.layers.DenseVariational(
+				units=units,
+				make_prior_fn=self.prior,
+				make_posterior_fn=self.posterior,
+				activation="sigmoid",
+				)(features)
+			featrues = layers.Dropout(0.2)
+
+		# The output is deterministic: a single point estimate.
+		outputs = layers.Dense(3, activation='softmax')(features)
+
+		model = keras.Model(inputs=inputs, outputs=outputs)
+
+		model.compile(
+			loss = 'categorical_crossentropy',
+			optimizer='adam'
+			)
+		if summary:
+			model.summary()
+			tf.keras.utils.plot_model(
+				model = model,
+				rankdir="TB",
+				dpi=72,
+				show_shapes=True
+				)
+
+		return model
+
+
 	def trainSNN(self,PATH,model,step,epochs=10,batch=16,plot=False):
 		'''
 		A function that trains a SNN given the model
