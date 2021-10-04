@@ -29,14 +29,14 @@ step = 1
 
 #Create the models
 cnn_model = img_class.createCNN(summary=False)
-#snn_model = trayectory.createDNN(step,summary=False)
+snn_model = trayectory.createDNN(step,summary=True)
 #snn_model = trayectory.createCSNN(step,summary=True)
-snn_model = trayectory.createDSNN(step,summary=True)
+#snn_model = trayectory.createDSNN(step,summary=True)
 
 
 #Train the models
 cnn_training_flag = False
-snn_training_flag = True
+snn_training_flag = False
 
 if cnn_training_flag:
 	weigth_file = save_model_path+cnn_weights_name+'.h5'
@@ -49,7 +49,7 @@ if snn_training_flag:
 	weigth_file = save_model_path+snn_weights_name+'.h5'
 	if os.path.isfile(weigth_file):
 		os.remove(weigth_file)
-	trayectory.trainSNN(snn_ds_path,snn_model,step,epochs=20)
+	trayectory.trainSNN(snn_ds_path,snn_model,step,epochs=50,batch=5)
 	#trayectory.trainSNNsingleFeat(snn_ds_path,snn_model,step,epochs=20)
 	aux.saveWeights(snn_model,save_model_path,snn_weights_name)
 
@@ -134,7 +134,7 @@ if trans_prob_DNN:
 			plt.clf()
 
 ###########Generate transition probabilities############################
-trans_prob_SNN = True
+trans_prob_SNN = False
 
 if trans_prob_SNN:
 	n = 500
@@ -165,6 +165,21 @@ if trans_prob_SNN:
 
 
 #Main Code: add any functionalities here.
+#Run the CNN to get inital step
+img_path = './InitialStates/test.png'
+#img_path = './InitialStates/4V-5tray-99step10s.png'
+img_batch = aux.preProcessImg(img_path)
+
+S0, _ = img_class.runCNN(cnn_model,img_batch)
+v = 4
+
+init_feat = {'Si': np.array([S0]),
+			 'V':np.array([v])}
+
+pred_traj = trayectory.trajectory(snn_model,init_feat,10)
+
+print(pred_traj)
+
 loop_flag = False
 
 if loop_flag:

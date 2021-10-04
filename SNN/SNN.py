@@ -6,6 +6,7 @@ from tensorflow.keras import layers
 from keras.models import Sequential
 from keras.layers import Dense, SimpleRNN, Input, Lambda, LSTM
 import tensorflow_probability as tfp
+import matplotlib.pyplot as plt
 from CNN.CNN import *
 
 import pandas as pd
@@ -170,7 +171,7 @@ class SNN():
 
 		# Create hidden layers with weight uncertainty 
 		#using the DenseVariational layer.
-		for units in [16,32]:
+		for units in [16,32,64]:
 			features = layers.Dense(units=units,activation="sigmoid")(features)
 			featrues = layers.Dropout(0.2)
 
@@ -220,17 +221,13 @@ class SNN():
 			features = layers.Dense(units=units,activation="sigmoid")(features)
 			featrues = layers.Dropout(0.2)
 
-		for units in [32,64]:
-			features = tfp.layers.DenseVariational(
-				units=units,
+		# The output is deterministic: a single point estimate.
+		outputs = tfp.layers.DenseVariational(
+				units = 3,
 				make_prior_fn=self.prior,
 				make_posterior_fn=self.posterior,
-				activation="sigmoid",
+				activation="softmax",
 				)(features)
-			featrues = layers.Dropout(0.2)
-
-		# The output is deterministic: a single point estimate.
-		outputs = layers.Dense(3, activation='softmax')(features)
 
 		model = keras.Model(inputs=inputs, outputs=outputs)
 
@@ -250,7 +247,7 @@ class SNN():
 		return model
 
 
-	def trainSNN(self,PATH,model,step,epochs=10,batch=16,plot=False):
+	def trainSNN(self,PATH,model,step,epochs=10,batch=1,plot=True):
 		'''
 		A function that trains a SNN given the model
 		and the PATH of the data set.
@@ -291,8 +288,8 @@ class SNN():
 
 		seed(1)
 
-		drop_Si=True
-		drop_So=False
+		drop_Si=False
+		drop_So=True
 
 
 		if drop_Si:
@@ -338,28 +335,34 @@ class SNN():
 					axis=1)
 		dataset.drop(columns=['index','level_0'],inplace=True)
 
+		bars = ['Fluid','Defective','Crystal']
+		x_pos = np.arange(len(bars))
+		plt.yticks(color='black')
+		fig_path = './Results/DS-Hist/probabilities/100s/MVR/Drop'
+		print('Calculating DS transition probabilities...........')
 		for v in [1,2,3,4]:
 			for si in [0,1,2]:
 				example_dict = {'Si': np.array([si]),
 				                'V':np.array([v])}
 				c = [0,0,0]
+				plt.xticks(x_pos, bars, color='black')
+				fig_name = fig_path+'MVRDS-L-S'+str(si)+'-V'+str(v)+'.png'
 				for index, row in dataset.iterrows():
 					if row['V'] == v and row['Si'] == si:
-						if row['So'] == 0:
-							c[0] += 1
-						elif row['So'] == 1:
-							c[1] += 1
-						else:
-							c[2] += 1
+						c[row['So']] += 1
+				plt.bar(x_pos,c,color='red')
+				plt.savefig(fig_name)
+				plt.clf()
 				print(example_dict)
 				print(c)
-				print(sum(c))
+				print(sum(c))	
+			
 
 		#train_labels.drop(columns=['index'],inplace=True)
 		#train_features.drop(columns=['index'],inplace=True)
 
-		print(train_features)
-		print(train_labels)
+		#print(train_features)
+		#print(train_labels)
 		train_labels.drop(columns=['level_0'],inplace=True)
 		train_features.drop(columns=['level_0'],inplace=True)
 
@@ -368,7 +371,7 @@ class SNN():
 
 		train_labels = np.array(train_labels,dtype=float)
 		train_labels_arr = np.zeros((len(train_labels),3),dtype=int)
-		print(train_labels)
+		#print(train_labels)
 		for i in range(len(train_labels)):
 			index = int(train_labels[i][0])
 			train_labels_arr[i][index] = 1 
@@ -379,7 +382,7 @@ class SNN():
 			train_labels_arr,
 			epochs=epochs,
 			batch_size=batch,
-			validation_split=0.1,
+			validation_split=0.2,
 			verbose=2
 			)
 
@@ -526,27 +529,25 @@ class SNN():
 		'''
 
 		out = model.predict(inp)
-		#x = [inp]
-		#out =[inp[0][0][0]]
+		return out
 
-		flag = False
+	def trajectory(self,model,init,length):
+		'''
+		Function that runs SNN.
+		Args:
+			-model: model to obtain probabilities from
+			-inp: dict containing input features
+		Returns:
+			-trajectory: list with predicted trajectories.
+		'''
 
-		if flag:
-			for i in range(length):
-				pred = model.predict(inp)
-
-				# Find index of maximum value from 2D numpy array
-				result = np.where(pred == np.amax(pred))
-				# zip the 2 arrays to get the exact coordinates
-				listOfCordinates = list(zip(result[0], result[1]))
-				index = listOfCordinates[0][1]
-				out.append(index)
-
-				time_stamp += t_step
-				new = [[out[-1],time_stamp,vol_lvl]]
-				inp = np.append(inp,np.reshape(new,(1,3,1)),axis=2)
-				inp = np.delete(inp,0,axis=2)
-				inp = np.reshape(inp,(1,3,step))
-				x.append(inp)
-		
-		return out#, x
+		trajectory = []
+		for i in range(length):
+			print(init)
+			probs = self.runSNN(model,init)
+			cat_dist = tfp.distributions.Categorical(probs=probs[0])		
+			trajectory.append(int(cat_dist.sample(1)[0]))
+			init['Si'] = np.array([trajectory[-1]])
+			#init['V'] = np.array([randint(1,4)])
+			#init['V'] = np.array([v[i]])
+		return trajectory
