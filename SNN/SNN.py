@@ -173,7 +173,7 @@ class SNN():
 		#using the DenseVariational layer.
 		for units in [16,32,64]:
 			features = layers.Dense(units=units,activation="sigmoid")(features)
-			featrues = layers.Dropout(0.2)
+			features = layers.Dropout(0.2)(features)
 
 		# The output is deterministic: a single point estimate.
 		outputs = layers.Dense(3, activation='softmax')(features)
@@ -316,8 +316,10 @@ class SNN():
 			arg_min = np.argmin(hist)
 
 			while max(hist) != min_hist:
-				index = randint(0,len(train_labels))
+				index = randint(0,len(train_labels)-1)
 				#print(index)
+				#print(train_features)
+				#print(train_labels)
 				hist_index = train_labels['So'][index]
 				if hist[hist_index] > min_hist:
 			 		train_labels.drop(index=index, inplace=True)
@@ -499,6 +501,163 @@ class SNN():
 			epochs=epochs,
 			batch_size=batch,
 			validation_split=0.1,
+			verbose=2
+			)
+
+		if plot:
+			#Plot Accuracy, change this to matplotlib
+			fig = go.Figure()
+			fig.add_trace(go.Scatter(x=history.epoch,
+	                         y=history.history['loss'],
+	                         mode='lines+markers',
+	                         name='Training accuracy'))
+			fig.add_trace(go.Scatter(x=history.epoch,
+	                         y=history.history['val_loss'],
+	                         mode='lines+markers',
+	                         name='Validation accuracy'))
+			fig.update_layout(title='Loss',
+	                  xaxis=dict(title='Epoch'),
+	                  yaxis=dict(title='Loss'))
+			fig.show()
+
+	def trainLSTMNN(self,PATH,model,step,epochs=10,batch=1,plot=True):
+		'''
+		A function that trains a SNN given the model
+		and the PATH of the data set.
+		'''
+		h = Helpers()
+		window = 10
+
+		train_features = pd.DataFrame()
+		train_labels = pd.DataFrame()
+		
+		for file in os.listdir(PATH):
+			if file.endswith('.csv'):
+				train_csv = PATH+'/'+file
+				X, Y = h.preProcessTens(train_csv)
+				tmp_X = pd.DataFrame(columns=['V','Si'])
+				tmp_Y = pd.DataFrame(columns=['So'])
+				for index, rows in X.iterrows():
+					new_size = len(X) - window
+					if index < new_size:
+						tmp_X = tmp_X.append(
+							{'V': rows['V_level'],
+							'Si':rows['cat_index']
+							},ignore_index=True)
+						tmp_Y = tmp_Y.append(
+							{'So':Y.loc[index+10,'cat_index']
+							},ignore_index=True)
+				train_features = train_features.append(tmp_X)
+				train_labels = train_labels.append(tmp_Y)
+		train_features.reset_index(inplace=True)
+		train_labels.reset_index(inplace=True)
+
+		hist = [0,0,0]
+
+		for index, rows in train_features.iterrows():
+			hist[rows['Si']] += 1
+
+		print(hist)
+
+		seed(1)
+
+		drop_Si=False
+		drop_So=True
+
+
+		if drop_Si:
+			min_hist = min(hist)
+			arg_min = np.argmin(hist)
+
+			while max(hist) != min_hist:
+				index = randint(0,len(train_labels)-1)
+				hist_index = train_features['Si'][index]
+				if hist[hist_index] > min_hist:
+			 		train_labels.drop(index=index, inplace=True)
+			 		train_features.drop(index=index, inplace=True)
+				hist = [0,0,0]
+				for index, rows in train_features.iterrows():
+					hist[rows['Si']] += 1
+				train_labels.reset_index(inplace=True)
+				train_features.reset_index(inplace=True)
+				train_labels.drop(columns=['index'],inplace=True)
+				train_features.drop(columns=['index'],inplace=True)
+			print(hist)
+
+		if drop_So:
+			min_hist = min(hist)
+			arg_min = np.argmin(hist)
+
+			while max(hist) != min_hist:
+				index = randint(0,len(train_labels)-1)
+				#print(index)
+				#print(train_features)
+				#print(train_labels)
+				hist_index = train_labels['So'][index]
+				if hist[hist_index] > min_hist:
+			 		train_labels.drop(index=index, inplace=True)
+			 		train_features.drop(index=index, inplace=True)
+				hist = [0,0,0]
+				for index, rows in train_labels.iterrows():
+					hist[rows['So']] += 1
+				train_labels.reset_index(inplace=True)
+				train_features.reset_index(inplace=True)
+				train_labels.drop(columns=['index'],inplace=True)
+				train_features.drop(columns=['index'],inplace=True)
+			print(hist)
+
+		dataset = pd.concat([train_features, train_labels.reset_index()],
+					axis=1)
+		dataset.drop(columns=['index','level_0'],inplace=True)
+
+		bars = ['Fluid','Defective','Crystal']
+		x_pos = np.arange(len(bars))
+		plt.yticks(color='black')
+		fig_path = './Results/DS-Hist/probabilities/100s/MVR/Drop'
+		print('Calculating DS transition probabilities...........')
+		for v in [1,2,3,4]:
+			for si in [0,1,2]:
+				example_dict = {'Si': np.array([si]),
+				                'V':np.array([v])}
+				c = [0,0,0]
+				plt.xticks(x_pos, bars, color='black')
+				fig_name = fig_path+'MVRDS-L-S'+str(si)+'-V'+str(v)+'.png'
+				for index, row in dataset.iterrows():
+					if row['V'] == v and row['Si'] == si:
+						c[row['So']] += 1
+				plt.bar(x_pos,c,color='red')
+				plt.savefig(fig_name)
+				plt.clf()
+				print(example_dict)
+				print(c)
+				print(sum(c))	
+			
+
+		#train_labels.drop(columns=['index'],inplace=True)
+		#train_features.drop(columns=['index'],inplace=True)
+
+		#print(train_features)
+		#print(train_labels)
+		train_labels.drop(columns=['level_0'],inplace=True)
+		train_features.drop(columns=['level_0'],inplace=True)
+
+		train_features_dict = {name: np.array(value,dtype=float)
+					for name, value in train_features.items()}
+
+		train_labels = np.array(train_labels,dtype=float)
+		train_labels_arr = np.zeros((len(train_labels),3),dtype=int)
+		#print(train_labels)
+		for i in range(len(train_labels)):
+			index = int(train_labels[i][0])
+			train_labels_arr[i][index] = 1 
+			
+
+
+		history = model.fit(train_features_dict,
+			train_labels_arr,
+			epochs=epochs,
+			batch_size=batch,
+			validation_split=0.2,
 			verbose=2
 			)
 

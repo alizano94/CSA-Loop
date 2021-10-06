@@ -20,7 +20,6 @@ trayectory = SNN()
 #Define variables
 cnn_ds_path = './CNN/DS'
 snn_ds_path = './SNN/test-DS/MVR'
-#snn_ds_path = './SNN/DS'
 save_model_path = './SavedModels/'
 cnn_weights_name = 'CNN'
 snn_weights_name = 'SNN'
@@ -103,14 +102,14 @@ if snn_test_flag:
 			print(sum(pred_dist[0]))
 
 ###########Generate transition probabilities############################
-trans_prob_DNN = False
+trans_prob_DNN = True
 
 if trans_prob_DNN:
-	n = 500
+	n = 1
 	bars = ['Fluid','Defective','Crystal']
 	x_pos = np.arange(len(bars))
 	plt.yticks(color='black')
-	fig_path = './Results/DNN/100s/MVR/Drop/'
+	fig_path = './Results/DNN/100s/MVR/Drop/one_step/'
 	print('Calculating '+str(n)+' step transition probabilities...........')
 	for v in [1,2,3,4]:
 		for init in [0,1,2]:
@@ -129,7 +128,8 @@ if trans_prob_DNN:
 										nbins=3
 										),dtype=tf.float32) / n
 			print(empirical_prob)
-			plt.bar(x_pos,empirical_prob,color='black')
+			#plt.bar(x_pos,empirical_prob,color='black')
+			plt.bar(x_pos,probs[0],color='black')
 			plt.savefig(fig_name)
 			plt.clf()
 
