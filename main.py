@@ -17,6 +17,7 @@ aux = Helpers()
 img_class = CNN()
 trayectory = SNN()
 
+
 #Define variables
 cnn_ds_path = './CNN/DS'
 snn_ds_path = './SNN/test-DS/MVR'
@@ -24,18 +25,19 @@ save_model_path = './SavedModels/'
 cnn_weights_name = 'CNN'
 snn_weights_name = 'SNN'
 cnn_out_ds_path = './CNN/testDS'
-step = 1
+step = 2
 
 #Create the models
 cnn_model = img_class.createCNN(summary=False)
-#snn_model = trayectory.createDNN(step,summary=True)
+snn_model = trayectory.createDNN(step,summary=True)
+#snn_model = trayectory.createRNN(step,summary=True)
 #snn_model = trayectory.createCSNN(step,summary=True)
-snn_model = trayectory.createDSNN(step,summary=True)
+#snn_model = trayectory.createDSNN(step,summary=True)
 
 
 #Train the models
 cnn_training_flag = False
-snn_training_flag = True
+snn_training_flag = False
 
 if cnn_training_flag:
 	weigth_file = save_model_path+cnn_weights_name+'.h5'
@@ -48,8 +50,9 @@ if snn_training_flag:
 	weigth_file = save_model_path+snn_weights_name+'.h5'
 	if os.path.isfile(weigth_file):
 		os.remove(weigth_file)
-	trayectory.trainSNN(snn_ds_path,snn_model,step,epochs=50,batch=5)
+	trayectory.trainSNN(snn_ds_path,snn_model,step,epochs=100,batch=5)
 	#trayectory.trainSNNsingleFeat(snn_ds_path,snn_model,step,epochs=20)
+	#trayectory.trainLSTM(snn_ds_path,snn_model,step,epochs=100,batch=5)
 	aux.saveWeights(snn_model,save_model_path,snn_weights_name)
 
 #Load weigths
@@ -102,20 +105,53 @@ if snn_test_flag:
 			print(sum(pred_dist[0]))
 
 ###########Generate transition probabilities############################
-trans_prob_DNN = True
+trans_prob_DNN = False
 
 if trans_prob_DNN:
 	n = 500
 	bars = ['Fluid','Defective','Crystal']
 	x_pos = np.arange(len(bars))
 	plt.yticks(color='black')
-	fig_path = './Results/DNN/100s/MVR/Drop/one_step/'
+	fig_path = './Results/LSTM/2stepMem/'
 	print('Calculating '+str(n)+' step transition probabilities...........')
 	for v in [1,2,3,4]:
 		for init in [0,1,2]:
 			plt.xticks(x_pos, bars, color='black')
 			fig_name = fig_path+'MVRDS-L-S'+str(init)+'-V'+str(v)+'.png'
 			example_dict = {'Si': np.array([init]),
+							'V':np.array([v])}
+			print(example_dict)
+			probs = trayectory.runSNN(snn_model,example_dict)
+			print(probs)
+			cat_dist = tfp.distributions.Categorical(probs=probs[0])
+			empirical_prob = tf.cast(
+					tf.histogram_fixed_width(
+						cat_dist.sample(int(n)),
+										[0, 2],
+										nbins=3
+										),dtype=tf.float32) / n
+			print(empirical_prob)
+			#plt.bar(x_pos,empirical_prob,color='black')
+			plt.bar(x_pos,probs[0],color='black')
+			plt.savefig(fig_name)
+			plt.clf()
+
+###########Generate transition probabilities############################
+trans_prob_LSTM = False
+
+if trans_prob_LSTM:
+	n = 500
+	bars = ['Fluid','Defective','Crystal']
+	x_pos = np.arange(len(bars))
+	plt.yticks(color='black')
+	fig_path = './Results/LSTM/2stepMem/'
+	print('Calculating '+str(n)+' step transition probabilities...........')
+	for v in [1,2,3,4]:
+		for init in [0,1,2]:
+			plt.xticks(x_pos, bars, color='black')
+			fig_name = fig_path+'MVRDS-L-S'+str(init)+'-V'+str(v)+'.png'
+			example_dict = {'S1': np.array([init]),
+							'S2': np.array([init]),
 							'V':np.array([v])}
 			print(example_dict)
 			probs = trayectory.runSNN(snn_model,example_dict)
@@ -141,7 +177,7 @@ if trans_prob_SNN:
 	bars = ['Fluid','Defective','Crystal']
 	x_pos = np.arange(len(bars))
 	plt.yticks(color='black')
-	fig_path = './Results/DSNN/100s/MVR/Drop'
+	fig_path = './Results/LSTM/'
 	print('Calculating '+str(n)+' step transition probabilities...........')
 	for v in [1,2,3,4]:
 		for init in [0,1,2]:
@@ -165,51 +201,61 @@ if trans_prob_SNN:
 
 
 #Main Code: add any functionalities here.
-#Run the CNN to get inital step
-img_path = './InitialStates/test.png'
-#img_path = './InitialStates/4V-5tray-99step10s.png'
-img_batch = aux.preProcessImg(img_path)
 
-S0, _ = img_class.runCNN(cnn_model,img_batch)
-v = 4
-
-init_feat = {'Si': np.array([S0]),
-			 'V':np.array([v])}
-
-pred_traj = trayectory.trajectory(snn_model,init_feat,10)
-
-print(pred_traj)
-
-loop_flag = False
-
+loop_flag = True
 if loop_flag:
-	vol_lvl = 4
-	t_step = 100
-
 	#Run the CNN to get inital step
 	img_path = './InitialStates/test.png'
+	#img_path = './InitialStates/4V-5tray-99step10s.png'
 	img_batch = aux.preProcessImg(img_path)
 
-	S0, S0_cat_label = img_class.runCNN(cnn_model,img_batch)
+	length = 10
+	x = np.arange(length+1)
+	bars = ['Fluid','Defective','Crystal']
+	y_pos = np.arange(len(bars))
+	fig_path = './'
 
-	init_feat = {'Si': np.array([S0]),
-				 'V':np.array([vol_lvl]),
-				 '#time':np.array([0])}
 
-	trajectory = [S0]
-	
-	for i in range(10):
-		#print(init_feat)
-		pred_dist = trayectory.runSNN(snn_model,init_feat)
-		out_state = np.argmax(pred_dist[0])
-		init_feat['Si'] = np.array([out_state])
-		init_feat['#time'] = init_feat['#time'] + np.array([t_step])
-		trajectory.append(out_state)
 
-	out_traj = {'step':np.arange(11),
-				'So':np.array(trajectory)}
-	out_traj = pd.DataFrame(out_traj)
-	out_traj.to_csv('./out.csv', sep='\t')
+	for v in [1,2,3,4]:
+		S0, _ = img_class.runCNN(cnn_model,img_batch)
+		init_feat = {'Si': np.array([S0]),
+					'V':np.array([v]),
+					't':np.array([0])}
+		fig_name = 'DNN-PredTraj-V'+str(v)+'-S0'+str(S0)+'10steps.png'
+
+		pred_traj, v_traj  = trayectory.trajectory(snn_model,init_feat,length)
+		print(init_feat)
+		print([S0]+pred_traj)
+		y = np.array([S0]+pred_traj)
+		v_traj = np.array([v]+v_traj)
+
+		fig, ax = plt.subplots()
+		twin1 = ax.twinx()
+
+		p1 = ax.scatter(x,y,label="Output State")
+		p2, = twin1.plot(x,v_traj,"r-", label="Voltage Level")
+
+		ax.set_ylim(-0.1,2.1)
+		twin1.set_ylim(-0.1, 4.1)
+		ax.set_yticks(y_pos)
+		ax.set_yticklabels(bars)
+
+		ax.set_xlabel("Time Step")
+		twin1.set_ylabel("Voltage Level")
+
+		tkw = dict(size=4, width=1.5)
+		ax.tick_params(axis='y', **tkw)
+		twin1.tick_params(axis='y', colors=p2.get_color(), **tkw)
+		ax.tick_params(axis='x', **tkw)
+
+		ax.legend(handles=[p1, p2])
+
+		plt.savefig(fig_path+fig_name)
+		plt.clf()
+
+
+
 
 
 ###########################Miscelanious####################################

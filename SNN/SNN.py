@@ -160,7 +160,8 @@ class SNN():
 
 		FEATURE_NAMES = [
 			'Si',
-			'V']
+			'V',
+			't']
 
 		inputs = {}
 		for name in FEATURE_NAMES:
@@ -172,6 +173,57 @@ class SNN():
 		# Create hidden layers with weight uncertainty 
 		#using the DenseVariational layer.
 		for units in [16,32,64]:
+			features = layers.Dense(units=units,activation="sigmoid")(features)
+			features = layers.Dropout(0.2)(features)
+
+		# The output is deterministic: a single point estimate.
+		outputs = layers.Dense(3, activation='softmax')(features)
+
+		model = keras.Model(inputs=inputs, outputs=outputs)
+
+		model.compile(
+			loss = 'categorical_crossentropy',
+			optimizer='adam'
+			)
+		if summary:
+			model.summary()
+			tf.keras.utils.plot_model(
+				model = model,
+				rankdir="TB",
+				dpi=72,
+				show_shapes=True
+				)
+
+		return model
+
+	def createRNN(self,step,summary=False):
+		'''
+		Function that creates and compile the SNN
+		args:
+			-step: time memory size
+		returns:
+			-model: stochastic/recurrent model.
+		''' 
+
+		inputs = {}
+		inputs['S1'] = tf.keras.Input(shape=(1,1), name='S1')
+		inputs['S2'] = tf.keras.Input(shape=(1,1), name='S2')
+		inputs['V'] = tf.keras.Input(shape=(1,), name='V')
+		
+
+		S1 = layers.BatchNormalization()(inputs['S1'])
+		S2 = layers.BatchNormalization()(inputs['S2'])
+		features = keras.layers.concatenate([S1,S2])
+		voltage = layers.BatchNormalization()(inputs['V'])
+		
+		features = LSTM(16)(features)
+
+
+		features = keras.layers.concatenate([features,voltage])
+
+		# Create hidden layers with weight uncertainty 
+		#using the DenseVariational layer.
+		for units in [32,64,128]:
 			features = layers.Dense(units=units,activation="sigmoid")(features)
 			features = layers.Dropout(0.2)(features)
 
@@ -266,14 +318,15 @@ class SNN():
 			if file.endswith('.csv'):
 				train_csv = PATH+'/'+file
 				X, Y = h.preProcessTens(train_csv)
-				tmp_X = pd.DataFrame(columns=['V','Si'])
+				tmp_X = pd.DataFrame(columns=['V','Si','t'])
 				tmp_Y = pd.DataFrame(columns=['So'])
 				for index, rows in X.iterrows():
 					new_size = len(X) - window
 					if index < new_size:
 						tmp_X = tmp_X.append(
 							{'V': rows['V_level'],
-							'Si':rows['cat_index']
+							'Si':rows['cat_index'],
+							't':rows['#time']
 							},ignore_index=True)
 						tmp_Y = tmp_Y.append(
 							{'So':Y.loc[index+10,'cat_index']
@@ -524,7 +577,7 @@ class SNN():
 	                  yaxis=dict(title='Loss'))
 			fig.show()
 
-	def trainLSTMNN(self,PATH,model,step,epochs=10,batch=1,plot=True):
+	def trainLSTM(self,PATH,model,step,epochs=10,batch=1,plot=True):
 		'''
 		A function that trains a SNN given the model
 		and the PATH of the data set.
@@ -539,76 +592,55 @@ class SNN():
 			if file.endswith('.csv'):
 				train_csv = PATH+'/'+file
 				X, Y = h.preProcessTens(train_csv)
-				tmp_X = pd.DataFrame(columns=['V','Si'])
+				tmp_X = pd.DataFrame(columns=['V','S1','S2'])
 				tmp_Y = pd.DataFrame(columns=['So'])
 				for index, rows in X.iterrows():
 					new_size = len(X) - window
-					if index < new_size:
+					if index < new_size and index >= step-1:
 						tmp_X = tmp_X.append(
 							{'V': rows['V_level'],
-							'Si':rows['cat_index']
+							'S1':X.at[index,'cat_index'],
+							'S2':X.at[index-1,'cat_index']
 							},ignore_index=True)
 						tmp_Y = tmp_Y.append(
 							{'So':Y.loc[index+10,'cat_index']
 							},ignore_index=True)
+
+
 				train_features = train_features.append(tmp_X)
 				train_labels = train_labels.append(tmp_Y)
 		train_features.reset_index(inplace=True)
 		train_labels.reset_index(inplace=True)
 
+		print(train_features)
+		print(train_labels)
+
 		hist = [0,0,0]
 
-		for index, rows in train_features.iterrows():
-			hist[rows['Si']] += 1
+		for index, rows in train_labels.iterrows():
+			hist[rows['So']] += 1
 
 		print(hist)
 
 		seed(1)
 
-		drop_Si=False
-		drop_So=True
+		min_hist = min(hist)
+		arg_min = np.argmin(hist)
 
-
-		if drop_Si:
-			min_hist = min(hist)
-			arg_min = np.argmin(hist)
-
-			while max(hist) != min_hist:
-				index = randint(0,len(train_labels)-1)
-				hist_index = train_features['Si'][index]
-				if hist[hist_index] > min_hist:
-			 		train_labels.drop(index=index, inplace=True)
-			 		train_features.drop(index=index, inplace=True)
-				hist = [0,0,0]
-				for index, rows in train_features.iterrows():
-					hist[rows['Si']] += 1
-				train_labels.reset_index(inplace=True)
-				train_features.reset_index(inplace=True)
-				train_labels.drop(columns=['index'],inplace=True)
-				train_features.drop(columns=['index'],inplace=True)
-			print(hist)
-
-		if drop_So:
-			min_hist = min(hist)
-			arg_min = np.argmin(hist)
-
-			while max(hist) != min_hist:
-				index = randint(0,len(train_labels)-1)
-				#print(index)
-				#print(train_features)
-				#print(train_labels)
-				hist_index = train_labels['So'][index]
-				if hist[hist_index] > min_hist:
-			 		train_labels.drop(index=index, inplace=True)
-			 		train_features.drop(index=index, inplace=True)
-				hist = [0,0,0]
-				for index, rows in train_labels.iterrows():
-					hist[rows['So']] += 1
-				train_labels.reset_index(inplace=True)
-				train_features.reset_index(inplace=True)
-				train_labels.drop(columns=['index'],inplace=True)
-				train_features.drop(columns=['index'],inplace=True)
-			print(hist)
+		while max(hist) != min_hist:
+			index = randint(0,len(train_labels)-1)
+			hist_index = int(train_labels['So'][index])
+			if hist[hist_index] > min_hist:
+		 		train_labels.drop(index=index, inplace=True)
+		 		train_features.drop(index=index, inplace=True)
+			hist = [0,0,0]
+			for index, rows in train_labels.iterrows():
+				hist[int(rows['So'])] += 1
+			train_labels.reset_index(inplace=True)
+			train_features.reset_index(inplace=True)
+			train_labels.drop(columns=['index'],inplace=True)
+			train_features.drop(columns=['index'],inplace=True)
+		print(hist)
 
 		dataset = pd.concat([train_features, train_labels.reset_index()],
 					axis=1)
@@ -627,7 +659,7 @@ class SNN():
 				plt.xticks(x_pos, bars, color='black')
 				fig_name = fig_path+'MVRDS-L-S'+str(si)+'-V'+str(v)+'.png'
 				for index, row in dataset.iterrows():
-					if row['V'] == v and row['Si'] == si:
+					if row['V'] == v and row['S1'] == si:
 						c[row['So']] += 1
 				plt.bar(x_pos,c,color='red')
 				plt.savefig(fig_name)
@@ -645,6 +677,7 @@ class SNN():
 		train_labels.drop(columns=['level_0'],inplace=True)
 		train_features.drop(columns=['level_0'],inplace=True)
 
+
 		train_features_dict = {name: np.array(value,dtype=float)
 					for name, value in train_features.items()}
 
@@ -654,6 +687,9 @@ class SNN():
 		for i in range(len(train_labels)):
 			index = int(train_labels[i][0])
 			train_labels_arr[i][index] = 1 
+
+
+		print(train_features_dict)
 			
 
 
@@ -705,12 +741,17 @@ class SNN():
 		'''
 
 		trajectory = []
+		v_traj = []
 		for i in range(length):
 			print(init)
+			v_traj.append(init['V'])
 			probs = self.runSNN(model,init)
 			cat_dist = tfp.distributions.Categorical(probs=probs[0])		
-			trajectory.append(int(cat_dist.sample(1)[0]))
-			init['Si'] = np.array([trajectory[-1]])
+			So = cat_dist.sample(1)[0]
+			to = init['t'][0]+100
+			trajectory.append(int(So))
+			init['Si'] = np.array([So])
+			init['t'] = np.array([to])
 			#init['V'] = np.array([randint(1,4)])
 			#init['V'] = np.array([v[i]])
-		return trajectory
+		return trajectory, v_traj

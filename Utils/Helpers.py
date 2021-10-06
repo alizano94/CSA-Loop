@@ -79,8 +79,8 @@ class Helpers():
 		dataset = pd.read_csv(csv)
 		train_features = dataset.copy()
 		train_features.drop(train_features.tail(1).index,inplace=True)
-		#train_features.drop(columns=['cat'],inplace=True)
-		train_features.drop(columns=['cat','#time'],inplace=True)
+		train_features.drop(columns=['cat'],inplace=True)
+		#train_features.drop(columns=['cat','#time'],inplace=True)
 
 		train_labels = dataset.copy()
 		train_labels.drop(columns=['cat','V_level','#time'],inplace=True)

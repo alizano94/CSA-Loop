@@ -193,3 +193,35 @@ if prom != min(hist):
 
 print(hist)
 print(prom)
+
+####################################################################################3
+
+loop_flag = False
+
+if loop_flag:
+	vol_lvl = 4
+	t_step = 100
+
+	#Run the CNN to get inital step
+	img_path = './InitialStates/test.png'
+	img_batch = aux.preProcessImg(img_path)
+
+	S0, S0_cat_label = img_class.runCNN(cnn_model,img_batch)
+
+	init_feat = {'Si': np.array([S0]),
+				 'V':np.array([vol_lvl])}
+
+	trajectory = [S0]
+	
+	for i in range(10):
+		#print(init_feat)
+		pred_dist = trayectory.runSNN(snn_model,init_feat)
+		out_state = np.argmax(pred_dist[0])
+		init_feat['Si'] = np.array([out_state])
+		init_feat['#time'] = init_feat['#time'] + np.array([t_step])
+		trajectory.append(out_state)
+
+	out_traj = {'step':np.arange(11),
+				'So':np.array(trajectory)}
+	out_traj = pd.DataFrame(out_traj)
+	out_traj.to_csv('./out.csv', sep='\t')
