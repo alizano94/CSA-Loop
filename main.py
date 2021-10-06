@@ -28,14 +28,14 @@ step = 1
 
 #Create the models
 cnn_model = img_class.createCNN(summary=False)
-snn_model = trayectory.createDNN(step,summary=True)
+#snn_model = trayectory.createDNN(step,summary=True)
 #snn_model = trayectory.createCSNN(step,summary=True)
-#snn_model = trayectory.createDSNN(step,summary=True)
+snn_model = trayectory.createDSNN(step,summary=True)
 
 
 #Train the models
 cnn_training_flag = False
-snn_training_flag = False
+snn_training_flag = True
 
 if cnn_training_flag:
 	weigth_file = save_model_path+cnn_weights_name+'.h5'
@@ -105,7 +105,7 @@ if snn_test_flag:
 trans_prob_DNN = True
 
 if trans_prob_DNN:
-	n = 1
+	n = 500
 	bars = ['Fluid','Defective','Crystal']
 	x_pos = np.arange(len(bars))
 	plt.yticks(color='black')

@@ -211,23 +211,27 @@ class SNN():
 		inputs = {}
 		for name in FEATURE_NAMES:
 			inputs[name] = tf.keras.Input(shape=(1,), name=name)
+
+		featrues_Si = layers.BatchNormalization()(inputs['Si'])
+		featrues_V = layers.BatchNormalization()(inputs['V'])
 		
-		features = keras.layers.concatenate(list(inputs.values()))
-		features = layers.BatchNormalization()(features)
-
-		# Create hidden layers with weight uncertainty 
-		#using the DenseVariational layer.
 		for units in [8,16]:
-			features = layers.Dense(units=units,activation="sigmoid")(features)
-			featrues = layers.Dropout(0.2)
-
-		# The output is deterministic: a single point estimate.
-		outputs = tfp.layers.DenseVariational(
-				units = 3,
+			featrues_Si = tfp.layers.DenseVariational(
+				units = units,
 				make_prior_fn=self.prior,
 				make_posterior_fn=self.posterior,
 				activation="softmax",
-				)(features)
+				)(featrues_Si)
+			featrues_Si = layers.Dropout(0.2)(featrues_Si)
+
+		for units in [8,16]:
+			featrues_V = layers.Dense(units=units,activation="sigmoid")(featrues_V)
+			featrues_V = layers.Dropout(0.2)(featrues_V)
+
+		features = keras.layers.concatenate([featrues_Si,featrues_V])
+
+		# The output is deterministic: a single point estimate.
+		outputs = layers.Dense(3, activation='softmax')(features)
 
 		model = keras.Model(inputs=inputs, outputs=outputs)
 
