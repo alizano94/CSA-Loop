@@ -10,9 +10,9 @@ import matplotlib.pyplot as plt
 from CNN.CNN import *
 
 import pandas as pd
-from random import seed, randint
 
 from Utils.Helpers import Helpers
+from sklearn.preprocessing import MinMaxScaler
 
 
 class SNN():
@@ -196,7 +196,7 @@ class SNN():
 
 		return model
 
-	def createRNN(self,step,summary=False):
+	def createRNN(self,step,summary=False,keep_v=False):
 		'''
 		Function that creates and compile the SNN
 		args:
@@ -205,25 +205,51 @@ class SNN():
 			-model: stochastic/recurrent model.
 		''' 
 
+		FEATURE_NAMES = []
+
+		for i in range(step):
+			name = 'S'+str(i-step)
+			FEATURE_NAMES += [name]
+
+		if keep_v:
+			for i in range(step):
+				name = 'V'+str(i-step)
+		else:
+			FEATURE_NAMES += ['V']
+
+
 		inputs = {}
-		inputs['S1'] = tf.keras.Input(shape=(1,1), name='S1')
-		inputs['S2'] = tf.keras.Input(shape=(1,1), name='S2')
-		inputs['V'] = tf.keras.Input(shape=(1,), name='V')
-		
+		for name in FEATURE_NAMES:
+			inputs[name] = tf.keras.Input(shape=(1,), name=name)
+		print(inputs)
 
-		S1 = layers.BatchNormalization()(inputs['S1'])
-		S2 = layers.BatchNormalization()(inputs['S2'])
-		features = keras.layers.concatenate([S1,S2])
-		voltage = layers.BatchNormalization()(inputs['V'])
-		
-		features = LSTM(16)(features)
+		if keep_v:
+			memory = inputs.copy()
+			for i in range(step):
+				name = 'V'+str(i-step)
+				memory.pop(name)
+		else:
+			memory = inputs.copy()
+			memory.pop('V')
 
+		features = keras.layers.concatenate(list(memory.values()))
+		features = layers.BatchNormalization()(features)
+		features = tf.keras.layers.Reshape((step,1), input_shape=(2,))(features)
+		for units in [16,32]:
+			features = LSTM(units,
+				activation="tanh",
+				recurrent_activation="sigmoid",
+				dropout=0.2,
+				recurrent_dropout=0.2)(features)
+			features = tf.keras.layers.Reshape((units,1))(features)
 
-		features = keras.layers.concatenate([features,voltage])
+		features = keras.layers.Flatten()(features)
+		features = keras.layers.concatenate([features,inputs['V']])
+		features = layers.BatchNormalization()(features)
 
 		# Create hidden layers with weight uncertainty 
 		#using the DenseVariational layer.
-		for units in [32,64,128]:
+		for units in [64,128]:
 			features = layers.Dense(units=units,activation="sigmoid")(features)
 			features = layers.Dropout(0.2)(features)
 
@@ -231,6 +257,9 @@ class SNN():
 		outputs = layers.Dense(3, activation='softmax')(features)
 
 		model = keras.Model(inputs=inputs, outputs=outputs)
+
+		#opt = keras.optimizers.Adam(learning_rate=0.01)
+
 
 		model.compile(
 			loss = 'categorical_crossentropy',
@@ -302,8 +331,7 @@ class SNN():
 
 		return model
 
-
-	def trainSNN(self,PATH,model,step,epochs=10,batch=1,plot=True):
+	def trainModel(self,PATH,model,step,epochs=10,batch=5,plot=True):
 		'''
 		A function that trains a SNN given the model
 		and the PATH of the data set.
@@ -311,390 +339,34 @@ class SNN():
 		h = Helpers()
 		window = 10
 
-		train_features = pd.DataFrame()
-		train_labels = pd.DataFrame()
-		
-		for file in os.listdir(PATH):
-			if file.endswith('.csv'):
-				train_csv = PATH+'/'+file
-				X, Y = h.preProcessTens(train_csv)
-				tmp_X = pd.DataFrame(columns=['V','Si','t'])
-				tmp_Y = pd.DataFrame(columns=['So'])
-				for index, rows in X.iterrows():
-					new_size = len(X) - window
-					if index < new_size:
-						tmp_X = tmp_X.append(
-							{'V': rows['V_level'],
-							'Si':rows['cat_index'],
-							't':rows['#time']
-							},ignore_index=True)
-						tmp_Y = tmp_Y.append(
-							{'So':Y.loc[index+10,'cat_index']
-							},ignore_index=True)
-				train_features = train_features.append(tmp_X)
-				train_labels = train_labels.append(tmp_Y)
-		train_features.reset_index(inplace=True)
-		train_labels.reset_index(inplace=True)
-
-		hist = [0,0,0]
-
-		for index, rows in train_features.iterrows():
-			hist[rows['Si']] += 1
-
+		load_resample = False
+		if load_resample:
+			PATH = './SNN/DS/Resampled'
+			train_features_csv = PATH + '/RS_train_featrues.csv'
+			train_labels_csv = PATH + '/RS_train_labels.csv'
+			train_features = pd.read_csv(train_features_csv,index_col=0)
+			train_labels =  pd.read_csv(train_labels_csv,index_col=0)
+		else:
+			train_features, train_labels = h.Data2df(PATH,step,window)
+		hist = h.createhist(train_labels)
 		print(hist)
 
-		seed(1)
+		if load_resample==False:
+			train_features, train_labels = h.DropBiasData(train_features,train_labels)
 
-		drop_Si=False
-		drop_So=True
+		plot_trans = False
+		if plot_trans:
+			fig_path = './Results/DS-Hist/probabilities/100s/MVR/Drop'
+			h.DataTrasnProbPlot(train_features,train_labels,fig_path)
 
-
-		if drop_Si:
-			min_hist = min(hist)
-			arg_min = np.argmin(hist)
-
-			while max(hist) != min_hist:
-				index = randint(0,len(train_labels)-1)
-				hist_index = train_features['Si'][index]
-				if hist[hist_index] > min_hist:
-			 		train_labels.drop(index=index, inplace=True)
-			 		train_features.drop(index=index, inplace=True)
-				hist = [0,0,0]
-				for index, rows in train_features.iterrows():
-					hist[rows['Si']] += 1
-				train_labels.reset_index(inplace=True)
-				train_features.reset_index(inplace=True)
-				train_labels.drop(columns=['index'],inplace=True)
-				train_features.drop(columns=['index'],inplace=True)
-			print(hist)
-
-		if drop_So:
-			min_hist = min(hist)
-			arg_min = np.argmin(hist)
-
-			while max(hist) != min_hist:
-				index = randint(0,len(train_labels)-1)
-				#print(index)
-				#print(train_features)
-				#print(train_labels)
-				hist_index = train_labels['So'][index]
-				if hist[hist_index] > min_hist:
-			 		train_labels.drop(index=index, inplace=True)
-			 		train_features.drop(index=index, inplace=True)
-				hist = [0,0,0]
-				for index, rows in train_labels.iterrows():
-					hist[rows['So']] += 1
-				train_labels.reset_index(inplace=True)
-				train_features.reset_index(inplace=True)
-				train_labels.drop(columns=['index'],inplace=True)
-				train_features.drop(columns=['index'],inplace=True)
-			print(hist)
-
-		dataset = pd.concat([train_features, train_labels.reset_index()],
-					axis=1)
-		dataset.drop(columns=['index','level_0'],inplace=True)
-
-		bars = ['Fluid','Defective','Crystal']
-		x_pos = np.arange(len(bars))
-		plt.yticks(color='black')
-		fig_path = './Results/DS-Hist/probabilities/100s/MVR/Drop'
-		print('Calculating DS transition probabilities...........')
-		for v in [1,2,3,4]:
-			for si in [0,1,2]:
-				example_dict = {'Si': np.array([si]),
-				                'V':np.array([v])}
-				c = [0,0,0]
-				plt.xticks(x_pos, bars, color='black')
-				fig_name = fig_path+'MVRDS-L-S'+str(si)+'-V'+str(v)+'.png'
-				for index, row in dataset.iterrows():
-					if row['V'] == v and row['Si'] == si:
-						c[row['So']] += 1
-				plt.bar(x_pos,c,color='red')
-				plt.savefig(fig_name)
-				plt.clf()
-				print(example_dict)
-				print(c)
-				print(sum(c))	
-			
-
-		#train_labels.drop(columns=['index'],inplace=True)
-		#train_features.drop(columns=['index'],inplace=True)
-
-		#print(train_features)
-		#print(train_labels)
-		train_labels.drop(columns=['level_0'],inplace=True)
-		train_features.drop(columns=['level_0'],inplace=True)
-
-		train_features_dict = {name: np.array(value,dtype=float)
-					for name, value in train_features.items()}
-
-		train_labels = np.array(train_labels,dtype=float)
-		train_labels_arr = np.zeros((len(train_labels),3),dtype=int)
-		#print(train_labels)
-		for i in range(len(train_labels)):
-			index = int(train_labels[i][0])
-			train_labels_arr[i][index] = 1 
-			
-
-
-		history = model.fit(train_features_dict,
-			train_labels_arr,
-			epochs=epochs,
-			batch_size=batch,
-			validation_split=0.2,
-			verbose=2
-			)
-
-		if plot:
-			#Plot Accuracy, change this to matplotlib
-			fig = go.Figure()
-			fig.add_trace(go.Scatter(x=history.epoch,
-	                         y=history.history['loss'],
-	                         mode='lines+markers',
-	                         name='Training accuracy'))
-			fig.add_trace(go.Scatter(x=history.epoch,
-	                         y=history.history['val_loss'],
-	                         mode='lines+markers',
-	                         name='Validation accuracy'))
-			fig.update_layout(title='Loss',
-	                  xaxis=dict(title='Epoch'),
-	                  yaxis=dict(title='Loss'))
-			fig.show()
-
-
-	def trainSNNsingleFeat(self,PATH,model,step,epochs=10,batch=16,plot=False):
-		'''
-		A function that trains a SNN given the model
-		and the PATH of the data set.
-		'''
-		h = Helpers()
-		window = 10
-
-		train_features = pd.DataFrame()
-		train_labels = pd.DataFrame()
-		
-		for file in os.listdir(PATH):
-			if file.endswith('.csv'):
-				train_csv = PATH+'/'+file
-				X, Y = h.preProcessTens(train_csv)
-				tmp_X = pd.DataFrame(columns=['V','Si'])
-				tmp_Y = pd.DataFrame(columns=['So'])
-				for index, rows in X.iterrows():
-					new_size = len(X) - window
-					if index < new_size:
-						tmp_X = tmp_X.append(
-							{'V': rows['V_level'],
-							'Si':rows['cat_index']
-							},ignore_index=True)
-						tmp_Y = tmp_Y.append(
-							{'So':Y.loc[index+10,'cat_index']
-							},ignore_index=True)
-				train_features = train_features.append(tmp_X)
-				train_labels = train_labels.append(tmp_Y)
-		train_features.reset_index(inplace=True)
-		train_labels.reset_index(inplace=True)
-
-		hist = [0,0,0]
-
-		index_list = []
-
-		for index, rows in train_features.iterrows():
-			if rows['Si'] != 1 or rows['V'] != 4:
-				index_list.append(index)
-			print(index_list)
-		train_labels.drop(index=index_list, inplace=True)
-		train_features.drop(index=index_list, inplace=True)
-		train_labels.reset_index(inplace=True)
-		train_features.reset_index(inplace=True)
-		train_labels.drop(columns=['index'],inplace=True)
-		train_features.drop(columns=['index'],inplace=True)
-
-		for index, rows in train_labels.iterrows():
-					hist[rows['So']] += 1
-
-		dataset = pd.concat([train_features, train_labels.reset_index()],
-					axis=1)
-		dataset.drop(columns=['index','level_0'],inplace=True)
-
-		for v in [1,2,3,4]:
-			for si in [0,1,2]:
-				example_dict = {'Si': np.array([si]),
-				                'V':np.array([v])}
-				c = [0,0,0]
-				for index, row in dataset.iterrows():
-					if row['V'] == v and row['Si'] == si:
-						if row['So'] == 0:
-							c[0] += 1
-						elif row['So'] == 1:
-							c[1] += 1
-						else:
-							c[2] += 1
-				print(example_dict)
-				print(c)
-				print(sum(c))
-
-		#train_labels.drop(columns=['index'],inplace=True)
-		#train_features.drop(columns=['index'],inplace=True)
-
-		#print(train_features)
-		#print(train_labels)
-		train_labels.drop(columns=['level_0'],inplace=True)
-		train_features.drop(columns=['level_0'],inplace=True)
-
-		train_features_dict = {name: np.array(value,dtype=float)
-					for name, value in train_features.items()}
-
-		train_labels = np.array(train_labels,dtype=float)
-		train_labels_arr = np.zeros((len(train_labels),3),dtype=int)
-		#print(train_labels)
-		for i in range(len(train_labels)):
-			index = int(train_labels[i][0])
-			train_labels_arr[i][index] = 1 
-			
-
-
-		history = model.fit(train_features_dict,
-			train_labels_arr,
-			epochs=epochs,
-			batch_size=batch,
-			validation_split=0.1,
-			verbose=2
-			)
-
-		if plot:
-			#Plot Accuracy, change this to matplotlib
-			fig = go.Figure()
-			fig.add_trace(go.Scatter(x=history.epoch,
-	                         y=history.history['loss'],
-	                         mode='lines+markers',
-	                         name='Training accuracy'))
-			fig.add_trace(go.Scatter(x=history.epoch,
-	                         y=history.history['val_loss'],
-	                         mode='lines+markers',
-	                         name='Validation accuracy'))
-			fig.update_layout(title='Loss',
-	                  xaxis=dict(title='Epoch'),
-	                  yaxis=dict(title='Loss'))
-			fig.show()
-
-	def trainLSTM(self,PATH,model,step,epochs=10,batch=1,plot=True):
-		'''
-		A function that trains a SNN given the model
-		and the PATH of the data set.
-		'''
-		h = Helpers()
-		window = 10
-
-		train_features = pd.DataFrame()
-		train_labels = pd.DataFrame()
-		
-		for file in os.listdir(PATH):
-			if file.endswith('.csv'):
-				train_csv = PATH+'/'+file
-				X, Y = h.preProcessTens(train_csv)
-				tmp_X = pd.DataFrame(columns=['V','S1','S2'])
-				tmp_Y = pd.DataFrame(columns=['So'])
-				for index, rows in X.iterrows():
-					new_size = len(X) - window
-					if index < new_size and index >= step-1:
-						tmp_X = tmp_X.append(
-							{'V': rows['V_level'],
-							'S1':X.at[index,'cat_index'],
-							'S2':X.at[index-1,'cat_index']
-							},ignore_index=True)
-						tmp_Y = tmp_Y.append(
-							{'So':Y.loc[index+10,'cat_index']
-							},ignore_index=True)
-
-
-				train_features = train_features.append(tmp_X)
-				train_labels = train_labels.append(tmp_Y)
-		train_features.reset_index(inplace=True)
-		train_labels.reset_index(inplace=True)
+		train_features = h.df2dict(train_features)
+		train_labels = h.onehotencoded(train_labels)
 
 		print(train_features)
 		print(train_labels)
 
-		hist = [0,0,0]
-
-		for index, rows in train_labels.iterrows():
-			hist[rows['So']] += 1
-
-		print(hist)
-
-		seed(1)
-
-		min_hist = min(hist)
-		arg_min = np.argmin(hist)
-
-		while max(hist) != min_hist:
-			index = randint(0,len(train_labels)-1)
-			hist_index = int(train_labels['So'][index])
-			if hist[hist_index] > min_hist:
-		 		train_labels.drop(index=index, inplace=True)
-		 		train_features.drop(index=index, inplace=True)
-			hist = [0,0,0]
-			for index, rows in train_labels.iterrows():
-				hist[int(rows['So'])] += 1
-			train_labels.reset_index(inplace=True)
-			train_features.reset_index(inplace=True)
-			train_labels.drop(columns=['index'],inplace=True)
-			train_features.drop(columns=['index'],inplace=True)
-		print(hist)
-
-		dataset = pd.concat([train_features, train_labels.reset_index()],
-					axis=1)
-		dataset.drop(columns=['index','level_0'],inplace=True)
-
-		bars = ['Fluid','Defective','Crystal']
-		x_pos = np.arange(len(bars))
-		plt.yticks(color='black')
-		fig_path = './Results/DS-Hist/probabilities/100s/MVR/Drop'
-		print('Calculating DS transition probabilities...........')
-		for v in [1,2,3,4]:
-			for si in [0,1,2]:
-				example_dict = {'Si': np.array([si]),
-				                'V':np.array([v])}
-				c = [0,0,0]
-				plt.xticks(x_pos, bars, color='black')
-				fig_name = fig_path+'MVRDS-L-S'+str(si)+'-V'+str(v)+'.png'
-				for index, row in dataset.iterrows():
-					if row['V'] == v and row['S1'] == si:
-						c[row['So']] += 1
-				plt.bar(x_pos,c,color='red')
-				plt.savefig(fig_name)
-				plt.clf()
-				print(example_dict)
-				print(c)
-				print(sum(c))	
-			
-
-		#train_labels.drop(columns=['index'],inplace=True)
-		#train_features.drop(columns=['index'],inplace=True)
-
-		#print(train_features)
-		#print(train_labels)
-		train_labels.drop(columns=['level_0'],inplace=True)
-		train_features.drop(columns=['level_0'],inplace=True)
-
-
-		train_features_dict = {name: np.array(value,dtype=float)
-					for name, value in train_features.items()}
-
-		train_labels = np.array(train_labels,dtype=float)
-		train_labels_arr = np.zeros((len(train_labels),3),dtype=int)
-		#print(train_labels)
-		for i in range(len(train_labels)):
-			index = int(train_labels[i][0])
-			train_labels_arr[i][index] = 1 
-
-
-		print(train_features_dict)
-			
-
-
-		history = model.fit(train_features_dict,
-			train_labels_arr,
+		history = model.fit(train_features,
+			train_labels,
 			epochs=epochs,
 			batch_size=batch,
 			validation_split=0.2,
@@ -730,7 +402,7 @@ class SNN():
 		out = model.predict(inp)
 		return out
 
-	def trajectory(self,model,init,length):
+	def trajectory(self,step,model,init,length):
 		'''
 		Function that runs SNN.
 		Args:
@@ -748,10 +420,12 @@ class SNN():
 			probs = self.runSNN(model,init)
 			cat_dist = tfp.distributions.Categorical(probs=probs[0])		
 			So = cat_dist.sample(1)[0]
-			to = init['t'][0]+100
+			
 			trajectory.append(int(So))
-			init['Si'] = np.array([So])
-			init['t'] = np.array([to])
-			#init['V'] = np.array([randint(1,4)])
-			#init['V'] = np.array([v[i]])
+			init['S-1'] = np.array([So])
+
+			for i in range(step-1):
+				name = 'S'+str(i-step)
+				past_state = 'S'+str(i-step+1)
+				init[name] = init[past_state]
 		return trajectory, v_traj
