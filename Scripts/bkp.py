@@ -502,3 +502,52 @@ if loop_flag:
 	                  xaxis=dict(title='Epoch'),
 	                  yaxis=dict(title='Loss'))
 			fig.show()
+
+##Obtain probability tensor###
+prob_tens = np.empty([4,3,3])
+for v in [1,2,3,4]:
+	for S0 in [0,1,2]:
+		init_feat = {'V':np.array([v])}
+		for i in range(step):
+			name = 'S'+str(i-step)
+			init_feat[name] = np.array([S0])
+		#print(init_feat)
+		probs = trayectory.runSNN(snn_model,init_feat)
+		print(sum(probs[0]))
+		prob_tens[v-1,S0,:] = probs[0]
+print(prob_tens)
+
+
+###########################Miscelanious####################################
+example_dict = {'S-4':np.array([0]),
+				'S-3':np.array([1]),
+				'S-2':np.array([1]),
+				'S-1':np.array([1]),
+				'V':np.array([4])}
+print(example_dict)
+
+fig_name = './test.png'
+n = 1000
+probs = trayectory.runSNN(snn_model,example_dict)
+cat_dist = tfp.distributions.Categorical(probs=probs[0])
+empirical_prob = tf.cast(
+	tf.histogram_fixed_width(
+		cat_dist.sample(int(n)),
+		[0, 2],
+		nbins=3
+		),dtype=tf.float32) / n
+
+print('Model Learned Probs :\n',probs)
+print('Sampled probs :\n',empirical_prob)
+
+bars = ['Fluid','Defective','Crystal']
+x_pos = np.arange(len(bars))
+plt.xticks(x_pos, bars, color='black')
+plt.yticks(color='black')
+plt.bar(x_pos,empirical_prob,color='black')
+#plt.bar(x_pos,probs[0],color='black')
+plt.savefig(fig_name)
+
+
+
+

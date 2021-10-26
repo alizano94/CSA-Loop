@@ -19,7 +19,7 @@ class SNN():
 	def __init__(self):
 		pass
 
-	def createDS(self,path,model):
+	def createDS(self,path,window):
 		'''
 		Function that creates the csv files that 
 		serve as DS for the CNN
@@ -29,45 +29,27 @@ class SNN():
 		'''
 
 		img_cls = CNN()
-		h = Helpers()
-		steps = [1,5,10]
 
-		imgs_path = path+'/plots'
+		data = pd.DataFrame()
 
-		for volts in os.listdir(imgs_path):
-			#Append Voltage dir to path
-			volt_path = imgs_path+'/'+volts
-			for step in os.listdir(volt_path):
-				#Append Trayectory dir to path
-				step_path = volt_path+'/'+step
-				step_num = int(step.replace("s",""))
-				for traj in os.listdir(step_path):
-					#Append time steps
-					traj_num = int(traj.replace("T",""))
-					file_path = step_path+'/'+traj
-					csv_name = path+'/'+volts+'-'+step+'-'+traj+'.csv'
-					csv_file = open(csv_name, "w+")
-					csv_file.write("#time,cat_index,cat,V_level\n")
-					num_files_dir = len([f for f in os.listdir(file_path)
-						if f.endswith('.png') 
-						and os.path.isfile(os.path.join(file_path, f))])
-					names = os.listdir(file_path+'/')
-					names = sorted(names, key = lambda x : (len(x), x.split("-")[2]))
-					for k in range(0,num_files_dir):
-						volt_num = names[k].split('-')[0]
-						volt_num = int(volt_num.replace("V",""))
-						file_name = file_path+'/'+str(volt_num)+'V-'+str(traj_num)+'tray-'+str(k)+'step'+str(step_num)+'s.png'
-						
-						#Classify the image as 0, 1 or 2
-						img_batch = h.preProcessImg(file_name)
-						index, label = img_cls.runCNN(model,img_batch)
-						csv_file.write(str(k*step_num)+','
-							+str(index)+','
-							+label+','
-							+str(volt_num)+'\n')
-					csv_file.close()
-
-		            
+		sep = '","'
+		for v_dir in os.listdir(path):
+			v_path = path+str(v_dir)
+			if os.path.isdir(v_path):
+				V = v_dir.replace('V','')
+				for sampling_dir in os.listdir(v_path):
+					sts_path = v_path+'/'+str(sampling_dir)
+					if os.path.isdir(sts_path):
+						sts_step = sampling_dir.replace('s','')
+						for traj_dir in os.listdir(sts_path):
+							traj_path = sts_path+'/'+str(traj_dir)
+							T = traj_dir.replace('T','')
+							if os.path.isdir(traj_path):
+								csv_name = 'V'+str(V)+'-'+str(sts_step)+'s-T'+str(T)+'.csv'
+								csv_path = traj_path+'/'+csv_name
+								if os.path.exists(csv_path):
+									csv_df = data = pd.read_csv(csv_path)
+									print(csv_df)		            
 
 
 	def prior(self,kernel_size, bias_size, dtype=None):

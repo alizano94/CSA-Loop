@@ -26,6 +26,7 @@ cnn_weights_name = 'CNN'
 snn_weights_name = 'SNN'
 cnn_out_ds_path = './CNN/testDS'
 step = 4
+window = 10
 
 #Create the models
 cnn_model = img_class.createCNN(summary=False)
@@ -37,7 +38,9 @@ snn_model = trayectory.createRNN(step,summary=True)
 
 #Train the models
 cnn_training_flag = False
-snn_training_flag = True
+snn_training_flag = False
+
+
 
 if cnn_training_flag:
 	weigth_file = save_model_path+cnn_weights_name+'.h5'
@@ -54,7 +57,7 @@ if snn_training_flag:
 	aux.saveWeights(snn_model,save_model_path,snn_weights_name)
 
 #Load weigths
-cnn_load_flag = False
+cnn_load_flag = True
 snn_load_flag = True
 
 if cnn_load_flag:
@@ -67,9 +70,10 @@ if snn_load_flag:
 	aux.loadWeights(load_path_snn,snn_model)
 
 #Create SNN DS
+trayectory.createDS('/home/lizano/Documents/CSA-Loop/SNN/DS/',window)
 snn_ds_create_flag = False
 if snn_ds_create_flag:
-	trayectory.createDS(snn_ds_path,cnn_model)
+	aux.preProcessSNNDS('/home/lizano/Documents/CSA-Loop/SNN/DS/',cnn_model)
 
 #Testing part.
 #Test NN
@@ -203,7 +207,7 @@ if trans_prob_SNN:
 
 #Main Code: add any functionalities here.
 
-loop_flag = True
+loop_flag = False
 if loop_flag:
 	#Run the CNN to get inital step
 	img_path = './InitialStates/test.png'
@@ -317,25 +321,6 @@ if loop_flag:
 
 			plt.savefig(fig_path+fig_name)
 			plt.clf()
-
-
-
-
-
-###########################Miscelanious####################################
-##Obtain probability tensor###
-prob_tens = np.empty([4,3,3])
-for v in [1,2,3,4]:
-	for S0 in [0,1,2]:
-		init_feat = {'V':np.array([v])}
-		for i in range(step):
-			name = 'S'+str(i-step)
-			init_feat[name] = np.array([S0])
-		#print(init_feat)
-		probs = trayectory.runSNN(snn_model,init_feat)
-		print(sum(probs[0]))
-		prob_tens[v-1,S0,:] = probs[0]
-print(prob_tens)
 
 
 

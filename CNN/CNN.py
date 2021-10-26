@@ -15,7 +15,7 @@ from tensorflow.keras.preprocessing import image
 from keras.models import model_from_json
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
-from Utils.Helpers import Helpers
+from Utils.Helpers import *
 
 
 class CNN():
