@@ -91,6 +91,37 @@ class Helpers():
 
 		return train_features, train_labels
 
+	def windowResampling(slef,data,sampling_ts,window,memory):
+		'''
+		Receives data in a dataframe and returns data frame 
+		with resampled data using slinding window method
+		'''
+		standard = ['Time','C6_avg','psi6','V']
+		columns = []+standard
+		for i in range(memory+1):
+			name = 'S'+str(-memory+i)
+			columns += [name]
+
+		out_df = pd.DataFrame(columns=columns)
+		new_size = len(data) - memory*window/sampling_ts
+
+		for index, rows in data.iterrows():
+			row = {}
+			if index < new_size:
+				for name in standard:
+					i = index+(memory-1)*window/sampling_ts
+					row[name] = data.at[i,name]
+				for m in range(memory+1):
+					name = 'S'+str(-memory+m)
+					i = index+m*window/sampling_ts
+					row[name] = data.at[i,'S_param']
+				print(row)
+				out_df = out_df.append(row,ignore_index=True)
+		
+
+		return out_df
+
+
 	def Data2df(self,PATH,step,window):
 		'''
 		Takes directory with csv and loads them into a DF

@@ -11,7 +11,7 @@ from CNN.CNN import *
 
 import pandas as pd
 
-from Utils.Helpers import Helpers
+from Utils.Helpers import *
 from sklearn.preprocessing import MinMaxScaler
 
 
@@ -19,7 +19,7 @@ class SNN():
 	def __init__(self):
 		pass
 
-	def createDS(self,path,window):
+	def createDS(self,path,window,memory):
 		'''
 		Function that creates the csv files that 
 		serve as DS for the CNN
@@ -29,6 +29,7 @@ class SNN():
 		'''
 
 		img_cls = CNN()
+		h = Helpers()
 
 		data = pd.DataFrame()
 
@@ -49,7 +50,10 @@ class SNN():
 								csv_path = traj_path+'/'+csv_name
 								if os.path.exists(csv_path):
 									csv_df = data = pd.read_csv(csv_path)
-									print(csv_df)		            
+									csv_df = h.windowResampling(csv_path,
+										sts_step,window,memory)
+									data = data.append(csv_df)
+											            
 
 
 	def prior(self,kernel_size, bias_size, dtype=None):

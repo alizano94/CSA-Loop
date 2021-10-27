@@ -25,7 +25,7 @@ save_model_path = './SavedModels/'
 cnn_weights_name = 'CNN'
 snn_weights_name = 'SNN'
 cnn_out_ds_path = './CNN/testDS'
-step = 4
+memory = 4
 window = 10
 
 #Create the models
