@@ -27,13 +27,12 @@ class SNN():
 			-path: path to SNN DS dir
 			-model: CNN model to predict
 		'''
-
-		img_cls = CNN()
 		h = Helpers()
 
 		data = pd.DataFrame()
 
 		sep = '","'
+		ds_name = path+'Balanced-W'+str(window)+'-M'+str(memory)+'.csv'
 		for v_dir in os.listdir(path):
 			v_path = path+str(v_dir)
 			if os.path.isdir(v_path):
@@ -49,10 +48,25 @@ class SNN():
 								csv_name = 'V'+str(V)+'-'+str(sts_step)+'s-T'+str(T)+'.csv'
 								csv_path = traj_path+'/'+csv_name
 								if os.path.exists(csv_path):
-									csv_df = data = pd.read_csv(csv_path)
-									csv_df = h.windowResampling(csv_path,
-										sts_step,window,memory)
-									data = data.append(csv_df)
+									if V != 'R':
+										csv_df = pd.read_csv(csv_path)
+										csv_df = h.windowResampling(csv_df,
+											int(sts_step),window,memory)
+										data = data.append(csv_df)
+									elif V == 'R' and int(sts_step) == window:
+										csv_df = pd.read_csv(csv_path)
+										csv_df = h.windowResampling(csv_df,
+											int(sts_step),int(sts_step),memory)
+										data = data.append(csv_df)
+									else:
+										pass
+
+		data.reset_index(inplace=True)						
+		data = h.DropBiasData(data)
+		data.drop(columns=['level_0'],inplace=True)
+		print('Saving DS of size: '+str(len(data)))
+		print(ds_name)
+		data.to_csv(ds_name,index=False)
 											            
 
 
@@ -317,36 +331,18 @@ class SNN():
 
 		return model
 
-	def trainModel(self,PATH,model,step,epochs=10,batch=5,plot=True):
+	def trainModel(self,path,model,epochs=10,batch=5,plot=True):
 		'''
 		A function that trains a SNN given the model
 		and the PATH of the data set.
 		'''
 		h = Helpers()
-		window = 10
 
-		load_resample = False
-		if load_resample:
-			PATH = './SNN/DS/Resampled'
-			train_features_csv = PATH + '/RS_train_featrues.csv'
-			train_labels_csv = PATH + '/RS_train_labels.csv'
-			train_features = pd.read_csv(train_features_csv,index_col=0)
-			train_labels =  pd.read_csv(train_labels_csv,index_col=0)
-		else:
-			train_features, train_labels = h.Data2df(PATH,step,window)
-		hist = h.createhist(train_labels)
-		print(hist)
+		data = pd.read_csv(path)
 
-		if load_resample==False:
-			train_features, train_labels = h.DropBiasData(train_features,train_labels)
-
-		plot_trans = False
-		if plot_trans:
-			fig_path = './Results/DS-Hist/probabilities/100s/MVR/Drop'
-			h.DataTrasnProbPlot(train_features,train_labels,fig_path)
-
-		train_features = h.df2dict(train_features)
-		train_labels = h.onehotencoded(train_labels)
+		
+		train_features = h.df2dict(data)
+		train_labels = h.onehotencoded(data)
 
 		print(train_features)
 		print(train_labels)

@@ -74,241 +74,6 @@ class Helpers():
 		img_batch = np.expand_dims(img_array, axis=0)
 		return img_batch
 
-	def preProcessTens(self,csv,print_tensors=False):
-		'''
-		Function that takes data form csv 
-		and creates a pd Data Frame to use as 
-		'''
-		dataset = pd.read_csv(csv)
-		train_features = dataset.copy()
-		train_features.drop(train_features.tail(1).index,inplace=True)
-		train_features.drop(columns=['cat'],inplace=True)
-		#train_features.drop(columns=['cat','#time'],inplace=True)
-
-		train_labels = dataset.copy()
-		train_labels.drop(columns=['cat','V_level','#time'],inplace=True)
-		train_labels.drop(train_labels.head(1).index,inplace=True)		
-
-		return train_features, train_labels
-
-	def windowResampling(slef,data,sampling_ts,window,memory):
-		'''
-		Receives data in a dataframe and returns data frame 
-		with resampled data using slinding window method
-		'''
-		standard = ['Time','C6_avg','psi6','V']
-		columns = []+standard
-		for i in range(memory+1):
-			name = 'S'+str(-memory+i)
-			columns += [name]
-
-		out_df = pd.DataFrame(columns=columns)
-		new_size = len(data) - memory*window/sampling_ts
-
-		for index, rows in data.iterrows():
-			row = {}
-			if index < new_size:
-				for name in standard:
-					i = index+(memory-1)*window/sampling_ts
-					row[name] = data.at[i,name]
-				for m in range(memory+1):
-					name = 'S'+str(-memory+m)
-					i = index+m*window/sampling_ts
-					row[name] = data.at[i,'S_param']
-				print(row)
-				out_df = out_df.append(row,ignore_index=True)
-		
-
-		return out_df
-
-
-	def Data2df(self,PATH,step,window):
-		'''
-		Takes directory with csv and loads them into a DF
-		'''
-		train_features = pd.DataFrame()
-		train_labels = pd.DataFrame()
-		
-		for file in os.listdir(PATH):
-			if file.endswith('.csv'):
-				train_csv = PATH+'/'+file
-				X, Y = self.preProcessTens(train_csv)
-				tmp_X = pd.DataFrame()#columns=['V','S1','S2'])
-				tmp_Y = pd.DataFrame(columns=['S0'])
-				for index, rows in X.iterrows():
-					new_size = len(X) - window
-					if index < new_size and index > step-1:
-						x_dict = {}
-						for i in range(step):
-							name = 'S'+str(-i-1)
-							x_dict[name] = X.at[index-i,'cat_index']
-						x_dict['V'] = rows['V_level']
-						tmp_X = tmp_X.append(x_dict,ignore_index=True)
-						tmp_Y = tmp_Y.append(
-							{'S0':Y.loc[index+window,'cat_index']
-							},ignore_index=True)
-
-
-				train_features = train_features.append(tmp_X)
-				train_labels = train_labels.append(tmp_Y)
-		train_features.reset_index(inplace=True)
-		train_labels.reset_index(inplace=True)
-
-
-		return train_features, train_labels
-
-	def createhist(self,train_labels):
-		'''
-		create histogram from labels data
-		'''
-		hist = [0,0,0]
-
-		for index, rows in train_labels.iterrows():
-			hist[rows['S0']] += 1
-
-		return hist
-
-	def DropBiasData(self,train_features,train_labels):
-		'''
-		Resamples the data to ensure theres no BIAS on 
-		ouput state dsitribution.
-		'''
-		seed(1)
-
-		hist = self.createhist(train_labels)
-
-		min_hist = min(hist)
-		arg_min = np.argmin(hist)
-
-		while max(hist) != min_hist:
-			index = randint(0,len(train_labels)-1)
-			hist_index = int(train_labels['S0'][index])
-			if hist[hist_index] > min_hist:
-		 		train_labels.drop(index=index, inplace=True)
-		 		train_features.drop(index=index, inplace=True)
-			hist = self.createhist(train_labels)
-			train_labels.reset_index(inplace=True)
-			train_features.reset_index(inplace=True)
-			train_labels.drop(columns=['index'],inplace=True)
-			train_features.drop(columns=['index'],inplace=True)
-		print(hist)
-
-		train_labels.drop(columns=['level_0'],inplace=True)
-		train_features.drop(columns=['level_0'],inplace=True)
-
-		PATH = './SNN/DS/Resampled'
-		train_features_csv = PATH + '/RS_train_featrues.csv'
-		train_labels_csv = PATH + '/RS_train_labels.csv'
-		train_features.to_csv(train_features_csv)
-		train_labels.to_csv(train_labels_csv)
-
-		return train_features, train_labels
-
-	def DataTrasnProbPlot(self,train_features,train_labels,fig_path):
-		'''
-		plot the transition probabilities fom the dataset
-		'''
-		dataset = pd.concat([train_features, train_labels.reset_index()],
-					axis=1)
-		dataset.drop(columns=['index'],inplace=True)
-
-		bars = ['Fluid','Defective','Crystal']
-		x_pos = np.arange(len(bars))
-		plt.yticks(color='black')
-		print('Calculating DS transition probabilities...........')
-		for v in [1,2,3,4]:
-			for si in [0,1,2]:
-				example_dict = {'Si': np.array([si]),
-				                'V':np.array([v])}
-				c = [0,0,0]
-				plt.xticks(x_pos, bars, color='black')
-				fig_name = fig_path+'MVRDS-L-S'+str(si)+'-V'+str(v)+'.png'
-				for index, row in dataset.iterrows():
-					if row['V'] == v and row['S-1'] == si:
-						c[row['S0']] += 1
-				plt.bar(x_pos,c,color='red')
-				plt.savefig(fig_name)
-				plt.clf()
-				print(example_dict)
-				print(c)
-				print(sum(c))
-
-	def df2dict(self,df,dtype=float):
-		'''
-		Takes a df and returns a dict of tensors
-		'''
-		out_dict = {name: np.array(value,dtype=dtype)
-					for name, value in df.items()}
-
-		return out_dict
-
-	def onehotencoded(slef,df,dtype=float):
-		'''
-		Transforms array with out state into one hot encoded vector
-		'''
-		array = np.array(df,dtype=dtype)
-		onehotencoded_array = np.zeros((len(array),3),dtype=int)
-		for i in range(len(array)):
-			index = int(array[i][0])
-			onehotencoded_array[i][index] = 1
-
-		return onehotencoded_array 
-
-
-
-	def saveWeights(self,model,save_path,name):
-		model.save_weights(os.path.join(save_path, name+'.h5'))
-
-	def loadWeights(self,load_path,model):
-		'''
-		Functions that loads weight for the model
-		args:
-			-load_path: path from which to load weights
-			-model: keras model
-		'''
-		#Load model wieghts
-		model.load_weights(load_path)
-		print("Loaded model from disk")
-
-	def csv2df(self,csvname):
-		'''
-		Function that extracts info from csv 
-		and creates array.
-		'''
-		results = []
-		with open(csvname) as csvfile:
-			reader = csv.reader(csvfile) # change contents to floats
-			headers = next(reader) 
-			for row in reader:
-				results.append(row)
-
-		x = []
-		for i in range(0,len(results)):
-			x.append(float(results[i][1]))
-
-		df = pd.DataFrame(x)
-
-		return df
-
-	def plotList(self,list,x_lab,y_lab,save_path='./out.png'):
-		'''
-		Function that plots elements on a list
-		'''
-		data = np.zeros((2,len(list)))
-		for i in range(len(list)):
-			data[0][i] = float(i)
-			data[1][i] = list[i]
-		plt.figure()
-		plt.figure()
-		plt.yticks([0, 1, 2], ['Fluid', 'Deffective', 'Crystal']
-			,rotation=45)
-		plt.ylim(-.5,2.5)
-		plt.xlabel(x_lab)
-		#plt.ylabel(y_lab)
-		plt.ylim(-.5,2.5)
-		plt.scatter(data[:][0],data[:][1],s=0.5)
-		plt.savefig(save_path)
-
 	def preProcessSNNDS(self,path,model):
 		'''
 		Method that takes op1.txt and plots and creates 
@@ -366,3 +131,228 @@ class Helpers():
 									os.system('rm -rf test.txt')
 									os.chdir(path)
 
+	def windowResampling(slef,data,sampling_ts,window,memory):
+		'''
+		Receives data in a dataframe and returns data frame 
+		with resampled data using slinding window method
+		'''
+		standard = ['Time','C6_avg','psi6','V']
+		columns = []+standard
+		for i in range(memory+1):
+			name = 'S'+str(-memory+i)
+			columns += [name]
+
+		out_df = pd.DataFrame(columns=columns)
+		new_size = int(len(data) - memory*window/sampling_ts)
+
+		for index, rows in data.iterrows():
+			row = {}
+			if index < new_size:
+				for name in standard:
+					i = int(index+(memory-1)*window/sampling_ts)
+					row[name] = data.at[i,name]
+				for m in range(memory+1):
+					name = 'S'+str(-memory+m)
+					i = int(index+m*window/sampling_ts)
+					row[name] = data.at[i,'S_param']
+				#print(row)
+				out_df = out_df.append(row,ignore_index=True)
+		
+
+		return out_df
+
+	def createhist(self,data):
+		'''
+		create histogram from labels data
+		'''
+		hist = [0,0,0]
+
+		for index, rows in data.iterrows():
+			hist[int(rows['S0'])] += 1
+		print(hist)
+
+		return hist
+
+	def DropBiasData(self,data):
+		'''
+		Resamples the data to ensure theres no BIAS on 
+		ouput state dsitribution.
+		'''
+		seed(1)
+
+		hist = self.createhist(data)
+
+		min_hist = min(hist)
+		arg_min = np.argmin(hist)
+
+		while max(hist) != min_hist:
+			index = randint(0,len(data)-1)
+			hist_index = int(data['S0'][index])
+			if hist[hist_index] > min_hist:
+		 		data.drop(index=index, inplace=True)
+			hist = self.createhist(data)
+			data.reset_index(inplace=True)
+			data.drop(columns=['index'],inplace=True)
+
+		return data
+
+	def df2dict(self,df,dtype=float):
+		'''
+		Takes a df and returns a dict of tensors
+		'''
+		out_dict = {name: np.array(value,dtype=dtype)
+					for name, value in df.items()}
+
+		return out_dict
+
+	def onehotencoded(self,df,dtype=float):
+		'''
+		Transforms array with out state into one hot encoded vector
+		'''
+		array = np.array(df['S0'],dtype=dtype)
+		onehotencoded_array = np.zeros((len(array),3),dtype=int)
+		for i in range(len(array)):
+			index = int(array[i])
+			onehotencoded_array[i][index] = 1
+
+		return onehotencoded_array
+
+
+	def preProcessTens(self,csv,print_tensors=False):
+		'''
+		Function that takes data form csv 
+		and creates a pd Data Frame to use as 
+		'''
+		dataset = pd.read_csv(csv)
+		train_features = dataset.copy()
+		train_features.drop(train_features.tail(1).index,inplace=True)
+		train_features.drop(columns=['cat'],inplace=True)
+		#train_features.drop(columns=['cat','#time'],inplace=True)
+
+		train_labels = dataset.copy()
+		train_labels.drop(columns=['cat','V_level','#time'],inplace=True)
+		train_labels.drop(train_labels.head(1).index,inplace=True)		
+
+		return train_features, train_labels
+
+	
+
+
+	def Data2df(self,PATH,step,window):
+		'''
+		Takes directory with csv and loads them into a DF
+		'''
+		train_features = pd.DataFrame()
+		train_labels = pd.DataFrame()
+		
+		for file in os.listdir(PATH):
+			if file.endswith('.csv'):
+				train_csv = PATH+'/'+file
+				X, Y = self.preProcessTens(train_csv)
+				tmp_X = pd.DataFrame()#columns=['V','S1','S2'])
+				tmp_Y = pd.DataFrame(columns=['S0'])
+				for index, rows in X.iterrows():
+					new_size = len(X) - window
+					if index < new_size and index > step-1:
+						x_dict = {}
+						for i in range(step):
+							name = 'S'+str(-i-1)
+							x_dict[name] = X.at[index-i,'cat_index']
+						x_dict['V'] = rows['V_level']
+						tmp_X = tmp_X.append(x_dict,ignore_index=True)
+						tmp_Y = tmp_Y.append(
+							{'S0':Y.loc[index+window,'cat_index']
+							},ignore_index=True)
+
+
+				train_features = train_features.append(tmp_X)
+				train_labels = train_labels.append(tmp_Y)
+		train_features.reset_index(inplace=True)
+		train_labels.reset_index(inplace=True)
+
+
+		return train_features, train_labels
+
+
+	def DataTrasnProbPlot(self,train_features,train_labels,fig_path):
+		'''
+		plot the transition probabilities fom the dataset
+		'''
+		dataset = pd.concat([train_features, train_labels.reset_index()],
+					axis=1)
+		dataset.drop(columns=['index'],inplace=True)
+
+		bars = ['Fluid','Defective','Crystal']
+		x_pos = np.arange(len(bars))
+		plt.yticks(color='black')
+		print('Calculating DS transition probabilities...........')
+		for v in [1,2,3,4]:
+			for si in [0,1,2]:
+				example_dict = {'Si': np.array([si]),
+				                'V':np.array([v])}
+				c = [0,0,0]
+				plt.xticks(x_pos, bars, color='black')
+				fig_name = fig_path+'MVRDS-L-S'+str(si)+'-V'+str(v)+'.png'
+				for index, row in dataset.iterrows():
+					if row['V'] == v and row['S-1'] == si:
+						c[row['S0']] += 1
+				plt.bar(x_pos,c,color='red')
+				plt.savefig(fig_name)
+				plt.clf()
+				print(example_dict)
+				print(c)
+				print(sum(c))
+
+
+	def saveWeights(self,model,save_path,name):
+		model.save_weights(os.path.join(save_path, name+'.h5'))
+
+	def loadWeights(self,load_path,model):
+		'''
+		Functions that loads weight for the model
+		args:
+			-load_path: path from which to load weights
+			-model: keras model
+		'''
+		#Load model wieghts
+		model.load_weights(load_path)
+		print("Loaded model from disk")
+
+	def csv2df(self,csvname):
+		'''
+		Function that extracts info from csv 
+		and creates array.
+		'''
+		results = []
+		with open(csvname) as csvfile:
+			reader = csv.reader(csvfile) # change contents to floats
+			headers = next(reader) 
+			for row in reader:
+				results.append(row)
+
+		x = []
+		for i in range(0,len(results)):
+			x.append(float(results[i][1]))
+
+		df = pd.DataFrame(x)
+
+		return df
+
+	def plotList(self,list,x_lab,y_lab,save_path='./out.png'):
+		'''
+		Function that plots elements on a list
+		'''
+		data = np.zeros((2,len(list)))
+		for i in range(len(list)):
+			data[0][i] = float(i)
+			data[1][i] = list[i]
+		plt.figure()
+		plt.figure()
+		plt.yticks([0, 1, 2], ['Fluid', 'Deffective', 'Crystal']
+			,rotation=45)
+		plt.ylim(-.5,2.5)
+		plt.xlabel(x_lab)
+		#plt.ylabel(y_lab)
+		plt.ylim(-.5,2.5)
+		plt.scatter(data[:][0],data[:][1],s=0.5)
+		plt.savefig(save_path)

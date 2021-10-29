@@ -147,43 +147,43 @@ class CNN():
                   yaxis=dict(title='Percentage'))
 		fig.show()
 
-	def testCNN(self,model,path):
+	def testCNN(self,path):
 		'''
 		Function thats test the CNN against its own DS.
 		Return class mtrix as numpy array
 		'''
-		aux = Helpers()
-		out_file = open(path+'error+log.txt',"w+")
-		out_file.write('#file,real_cat,pred_cat\n')
-		sep = '###################'
-		category = ['Fluid', 'Defective', 'Crystal']
 
+		columns = ['Time','C6_avg','psi6','V','S_cnn','S_param','Path','Step']
+		data = pd.DataFrame()
+		Conf_Mat = np.zeros([3,3])
 
-		train_path = path+'/train/'
-		test_path = path+'/test/'
-		paths = [train_path,test_path]
-		d = len(next(os.walk(train_path))[1])
-		class_mat = np.zeros((d,d))
-
-		for direct in paths:
-			out_file.write(sep+direct+sep+'\n')
-			for entry in os.scandir(direct):
-				if entry.is_dir():
-					cat = int(str(entry.path)[-1])
-					out_file.write(sep+entry.path+sep+'\n')
-					print(cat)
-					for file in os.scandir(entry.path):
-						if (file.path.endswith('.png')) and file.is_file():
-							img_batch = aux.preProcessImg(file.path)
-							pred, dum = self.runCNN(model,img_batch)
-							class_mat[pred][cat] += 1
-							if pred != cat:
-								log = file.path+','+category[cat]+','+dum+'\n'
-								out_file.write(log)
-		out_file.close()
-		return class_mat
-
-
+		for v_dir in os.listdir(path):
+			v_path = path+str(v_dir)
+			if os.path.isdir(v_path):
+				V = v_dir.replace('V','')
+				for sampling_dir in os.listdir(v_path):
+					sts_path = v_path+'/'+str(sampling_dir)
+					if os.path.isdir(sts_path):
+						sts_step = sampling_dir.replace('s','')
+						for traj_dir in os.listdir(sts_path):
+							traj_path = sts_path+'/'+str(traj_dir)
+							T = traj_dir.replace('T','')
+							if os.path.isdir(traj_path):
+								csv_name = 'V'+str(V)+'-'+str(sts_step)+'s-T'+str(T)+'.csv'
+								csv_path = traj_path+'/'+csv_name
+								if os.path.exists(csv_path):
+									csv_df = pd.read_csv(csv_path)
+									for index,rows in csv_df.iterrows():
+										i = int(rows['S_param'])
+										j = int(rows['S_cnn'])
+										Conf_Mat[i,j] += 1
+										if i != j:
+											entry = rows.to_dict()
+											entry['Path'] = traj_path
+											entry['Step'] = int(int(rows['Time'])/int(sts_step))
+											data = data.append(entry,ignore_index=True)
+		print(Conf_Mat)
+		data.to_csv('./CNNerror_log.csv',index=False)
 
 
 	def runCNN(self,model,img_batch):
