@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
@@ -8,8 +9,6 @@ from keras.layers import Dense, SimpleRNN, Input, Lambda, LSTM
 import tensorflow_probability as tfp
 import matplotlib.pyplot as plt
 from CNN.CNN import *
-
-import pandas as pd
 
 from Utils.Helpers import *
 from sklearn.preprocessing import MinMaxScaler
@@ -382,6 +381,21 @@ class SNN():
 		'''
 
 		out = model.predict(inp)
+		return out
+
+	def runSNN2(self,model,inp):
+		'''
+		Function that runs SNN.
+		Args:
+			-model: SNN model object
+			-inp: input state
+		Returns:
+			-out
+		'''
+
+		probs = model.predict(inp)
+		cat_dist = tfp.distributions.Categorical(probs=probs[0])		
+		out = cat_dist.sample(1)[0]
 		return out
 
 	def trajectory(self,step,model,init,length):

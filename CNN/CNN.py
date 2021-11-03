@@ -1,8 +1,8 @@
 import os
-import tensorflow as tf
 import numpy as np
+import pandas as pd
 
-
+import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Conv2D, Flatten, Dropout, MaxPooling2D
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
@@ -22,6 +22,40 @@ class CNN():
 
 	def __init__(self):
 		pass
+
+	def feedSNN2CNN(self,path,dump_path):
+		'''
+		Method that feed CNN DS with data from SNN
+		'''
+		for v_dir in os.listdir(path):
+			v_path = path+str(v_dir)
+			if os.path.isdir(v_path):
+				V = v_dir.replace('V','')
+				for sampling_dir in os.listdir(v_path):
+					sts_path = v_path+'/'+str(sampling_dir)
+					if os.path.isdir(sts_path):
+						sts_step = sampling_dir.replace('s','')
+						for traj_dir in os.listdir(sts_path):
+							traj_path = sts_path+'/'+str(traj_dir)
+							T = traj_dir.replace('T','')
+							if os.path.isdir(traj_path):
+								csv_name = 'V'+str(V)+'-'+str(sts_step)+'s-T'+str(T)+'.csv'
+								csv_path = traj_path+'/'+csv_name
+								if os.path.exists(csv_path):
+									data = pd.read_csv(csv_path)
+									plots_dir = traj_path+'/plots/'
+									for index,row in data.iterrows():
+										image_name = 'V'+str(V)+'-T'+str(T)+'-'+str(index)+'step-'+str(sts_step)+'s.png'
+										image_name = plots_dir+image_name
+										if row['S_param'] == 0:
+											os.system('cp -r '+image_name+' '+dump_path+'/0/')
+										elif row['S_param'] == 1:
+											os.system('cp -r '+image_name+' '+dump_path+'/1/')
+										else:
+											os.system('cp -r '+image_name+' '+dump_path+'/2/')
+
+
+
 
 	def createCNN(self,IMG_H=212,IMG_W=212,chan=1,summary=False):
 		'''
@@ -147,43 +181,72 @@ class CNN():
                   yaxis=dict(title='Percentage'))
 		fig.show()
 
-	def testCNN(self,path):
+	def testCNN(self,path,model,DS='CNN'):
 		'''
 		Function thats test the CNN against its own DS.
 		Return class mtrix as numpy array
 		'''
-
-		columns = ['Time','C6_avg','psi6','V','S_cnn','S_param','Path','Step']
-		data = pd.DataFrame()
+		from Utils.Helpers import Helpers
+		h = Helpers()
 		Conf_Mat = np.zeros([3,3])
 
-		for v_dir in os.listdir(path):
-			v_path = path+str(v_dir)
-			if os.path.isdir(v_path):
-				V = v_dir.replace('V','')
-				for sampling_dir in os.listdir(v_path):
-					sts_path = v_path+'/'+str(sampling_dir)
-					if os.path.isdir(sts_path):
-						sts_step = sampling_dir.replace('s','')
-						for traj_dir in os.listdir(sts_path):
-							traj_path = sts_path+'/'+str(traj_dir)
-							T = traj_dir.replace('T','')
-							if os.path.isdir(traj_path):
-								csv_name = 'V'+str(V)+'-'+str(sts_step)+'s-T'+str(T)+'.csv'
-								csv_path = traj_path+'/'+csv_name
-								if os.path.exists(csv_path):
-									csv_df = pd.read_csv(csv_path)
-									for index,rows in csv_df.iterrows():
-										i = int(rows['S_param'])
-										j = int(rows['S_cnn'])
-										Conf_Mat[i,j] += 1
-										if i != j:
-											entry = rows.to_dict()
-											entry['Path'] = traj_path
-											entry['Step'] = int(int(rows['Time'])/int(sts_step))
-											data = data.append(entry,ignore_index=True)
+		if DS=='SNN':
+			columns = ['Time','C6_avg','psi6','V','S_cnn','S_param','Path','Step']
+			data = pd.DataFrame(columns=columns)
+
+			for v_dir in os.listdir(path):
+				v_path = path+str(v_dir)
+				if os.path.isdir(v_path):
+					V = v_dir.replace('V','')
+					for sampling_dir in os.listdir(v_path):
+						sts_path = v_path+'/'+str(sampling_dir)
+						if os.path.isdir(sts_path):
+							sts_step = sampling_dir.replace('s','')
+							for traj_dir in os.listdir(sts_path):
+								traj_path = sts_path+'/'+str(traj_dir)
+								T = traj_dir.replace('T','')
+								if os.path.isdir(traj_path):
+									csv_name = 'V'+str(V)+'-'+str(sts_step)+'s-T'+str(T)+'.csv'
+									csv_path = traj_path+'/'+csv_name
+									if os.path.exists(csv_path):
+										csv_df = pd.read_csv(csv_path)
+										for index,rows in csv_df.iterrows():
+											if (index*int(sts_step) % 1) == 0:
+												i = int(rows['S_param'])
+												j = int(rows['S_cnn'])
+												Conf_Mat[i,j] += 1
+												if i != j:
+													entry = rows.to_dict()
+													entry['Path'] = traj_path
+													entry['Step'] = index
+													data = data.append(entry,ignore_index=True)
+		elif DS == 'CNN':
+			data = pd.DataFrame()
+			path =	'/home/lizano/Documents/CSA-Loop/CNN/DS/'
+			for dir_name in ['test/','train/']:
+				new_path = path+dir_name
+				if os.path.isdir(new_path):
+					for tag in os.listdir(new_path):
+						real_state = int(tag)
+						new_path = path+dir_name+tag+'/'
+						for filename in os.listdir(new_path):
+							if filename.endswith(".png"):
+								img = new_path+filename
+								img_batch = h.preProcessImg(img)
+								s_cnn, _ = self.runCNN(model,img_batch)
+								Conf_Mat[int(real_state),int(s_cnn)] += 1
+								if int(real_state) != int(s_cnn):
+									entry = {}
+									entry['Path'] = new_path
+									entry['Step'] = filename
+									data = data.append(entry,ignore_index=True)
 		print(Conf_Mat)
+		print('Number of point in data set: ',Conf_Mat.sum())
 		data.to_csv('./CNNerror_log.csv',index=False)
+
+		score = Conf_Mat.trace()/Conf_Mat.sum()
+
+		return score
 
 
 	def runCNN(self,model,img_batch):

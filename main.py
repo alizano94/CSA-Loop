@@ -1,7 +1,9 @@
 import os
 
+import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
+from IPython.display import clear_output
 
 
 from Utils.Helpers import *
@@ -21,6 +23,7 @@ snn_train = False
 preprocess_snnDS = False
 Test_CNN = True
 Test_SNN = False
+feed_CNN = False
 
 
 #Parameters
@@ -76,6 +79,11 @@ else:
 #Test Data 
 #Test CNN accuracy.
 if Test_CNN:
-	CNN.testCNN(snn_ds_dir)
+	score = CNN.testCNN(snn_ds_dir,cnn_model,DS='SNN')
+	print('Prediction accuracy for CNN :'+str(score))
+if feed_CNN:
+	dump_path = '/home/lizano/Documents/CSA-Loop/CNN/DS/Dump'
+	CNN.feedSNN2CNN(snn_ds_dir,dump_path)
+
 
 
