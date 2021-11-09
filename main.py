@@ -21,7 +21,7 @@ RL = RL()
 #Define Variables
 #FLAGS
 cnn_train = False
-snn_train = False
+snn_train = True
 rl_train = False
 preprocess_snnDS = False
 Test_CNN = False
@@ -32,7 +32,7 @@ run_loop = False
 
 #Parameters
 k = 3
-memory = 1
+memory = 4
 window = 100
 
 #paths
@@ -44,7 +44,7 @@ csv_snnDS_path = snn_ds_dir+csv_snnDS_path
 weights_dir = './SavedModels/'
 cnn_weights = weights_dir+'CNN.h5'
 snn_weights = weights_dir+'SNN.h5'
-q_table_file = rl_ds_dir+'3X4Q_table'+str(memory)+'M.npy'
+q_table_file = rl_ds_dir+str(k**(memory))+'X4Q_table'+str(memory)+'M.npy'
 
 #CNN
 #Create CNN model

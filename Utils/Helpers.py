@@ -356,3 +356,42 @@ class Helpers():
 		plt.ylim(-.5,2.5)
 		plt.scatter(data[:][0],data[:][1],s=0.5)
 		plt.savefig(save_path)
+
+	def stateEncoder(self,k,state):
+		'''
+		Method that encondes a given state into 
+		a number
+		'''
+		s = 0
+		m = len(state)
+		for i in range(m):
+			j = m - i -1
+			s += state[j]*k**i
+		return s
+
+	def stateDecoder(k,state,m):
+		'''
+		Method that decodes stae from number to 
+		input vector.
+		'''
+		done = False
+		out = []
+		q,r = 0,0
+		q = state
+		while not done:
+			new_q = q // k
+			print(new_q)
+			r = q % k
+			q = new_q
+			out.append(r)
+			if new_q == 0:
+				done = True
+		while len(out) < m:
+			out.append(0)
+
+		print(out)
+		out = out[::-1]
+		return out
+
+
+
