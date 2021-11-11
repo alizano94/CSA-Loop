@@ -274,38 +274,72 @@ class Helpers():
 		return train_features, train_labels
 
 
-	def DataTrasnProbPlot(self,train_features,train_labels,fig_path):
+	def DataTrasnProbPlot(self,W,M,k,Balanced=True):
 		'''
-		plot the transition probabilities fom the dataset
+		Plot transition probabilities from Dataset
 		'''
-		dataset = pd.concat([train_features, train_labels.reset_index()],
-					axis=1)
-		dataset.drop(columns=['index'],inplace=True)
+		size = k**M
+		hist = []
+		bars = []
+		volt_lvl = [1,2,3,4]
+		for i in range(k):
+			state = 'S'+str(i)
+			hist += [0]
+			bars += [state]
 
-		bars = ['Fluid','Defective','Crystal']
 		x_pos = np.arange(len(bars))
 		plt.yticks(color='black')
-		print('Calculating DS transition probabilities...........')
-		for v in [1,2,3,4]:
-			for si in [0,1,2]:
-				example_dict = {'Si': np.array([si]),
-				                'V':np.array([v])}
-				c = [0,0,0]
+		
+		if Balanced:
+			csv_path = '/home/lizano/Documents/CSA-Loop/SNN/DS/Balanced-W'+str(W)+'-M'+str(M)+'.csv'
+		else:
+			csv_path = '/home/lizano/Documents/CSA-Loop/SNN/DS/UnBalanced-W'+str(W)+'-M'+str(M)+'.csv'
+
+		save_path = '/home/lizano/Documents/CSA-Loop/Results/DataSet/plots/'
+
+		data = pd.read_csv(csv_path)
+
+		col_list = ['V']
+		for i in range(M):
+			name = 'S'+str(i-M)
+			col_list += [name]
+
+		for V in volt_lvl:
+			for encoded in range(size):
+				state = self.stateDecoder(k,encoded,M)
+				print(state)
+				for i in range(k):
+					hist[i] = 0
+				search_dict = {'V':V}
+				for i in range(M):
+					name = 'S'+str(i-M)
+					search_dict[name] = state[i]
+				print(search_dict)
+
+				for index, row in data.iterrows():
+					row_dict = row[col_list].to_dict()
+					s0 = int(row['S0'])
+					if row_dict == search_dict:
+						hist[s0] += 1
+
+				if sum(hist) != 0:
+					hist[:] = [x/sum(hist) for x in hist]
+				print(hist)
+
+				fig_name = save_path + 'V'+str(V)
+				for i in range(M):
+					name = 'S'+str(i-M)
+					fig_name += '-'+name+str(int(search_dict[name]))
+				fig_name += '.png'
 				plt.xticks(x_pos, bars, color='black')
-				fig_name = fig_path+'MVRDS-L-S'+str(si)+'-V'+str(v)+'.png'
-				for index, row in dataset.iterrows():
-					if row['V'] == v and row['S-1'] == si:
-						c[row['S0']] += 1
-				plt.bar(x_pos,c,color='red')
+				plt.bar(x_pos,hist,color='red')
 				plt.savefig(fig_name)
 				plt.clf()
-				print(example_dict)
-				print(c)
-				print(sum(c))
 
 
-	def saveWeights(self,model,save_path,name):
-		model.save_weights(os.path.join(save_path, name+'.h5'))
+
+	def saveWeights(self,model,save_path):
+		model.save_weights(save_path, save_path)
 
 	def loadWeights(self,load_path,model):
 		'''
@@ -369,7 +403,7 @@ class Helpers():
 			s += state[j]*k**i
 		return s
 
-	def stateDecoder(k,state,m):
+	def stateDecoder(self,k,state,m):
 		'''
 		Method that decodes stae from number to 
 		input vector.
@@ -380,7 +414,7 @@ class Helpers():
 		q = state
 		while not done:
 			new_q = q // k
-			print(new_q)
+			#print(new_q)
 			r = q % k
 			q = new_q
 			out.append(r)
@@ -389,7 +423,7 @@ class Helpers():
 		while len(out) < m:
 			out.append(0)
 
-		print(out)
+		#print(out)
 		out = out[::-1]
 		return out
 

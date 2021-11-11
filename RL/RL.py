@@ -12,29 +12,13 @@ class RL():
 	def __init__(self):
 		pass
 
-	def stateSpaceEncoding(self,memory,k,state):
-		'''
-		Method that encondes a given state into 
-		a number
-		'''
-		out = 0
-		for i in range(len(state)):
-			if i == 0:
-				out += state[i]
-			else:
-				out += 3*state[i]
-
-		return out
-
-
-
 	def get_Q_table(self,env,memory,k,a_size=4):
 		'''
 		Learns the q table 
 		'''
 		snn = SNN()
 
-		s_size = k^(memory+1)
+		s_size = k**memory
 
 		out_file = './RL/'+str(s_size)+'X'+str(a_size)+'Q_table'+str(memory)+'M.npy'
 

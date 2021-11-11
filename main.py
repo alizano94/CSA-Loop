@@ -21,18 +21,19 @@ RL = RL()
 #Define Variables
 #FLAGS
 cnn_train = False
-snn_train = True
+snn_train = False
 rl_train = False
 preprocess_snnDS = False
 Test_CNN = False
 Test_SNN = False
 feed_CNN = False
-run_loop = False
+run_loop = True
+constant_V = False
 
 
 #Parameters
 k = 3
-memory = 4
+memory = 1
 window = 100
 
 #paths
@@ -43,7 +44,7 @@ csv_snnDS_path = 'Balanced-W'+str(window)+'-M'+str(memory)+'.csv'
 csv_snnDS_path = snn_ds_dir+csv_snnDS_path
 weights_dir = './SavedModels/'
 cnn_weights = weights_dir+'CNN.h5'
-snn_weights = weights_dir+'SNN.h5'
+snn_weights = weights_dir+'SNN'+str(window)+'-M'+str(memory)+'.h5'
 q_table_file = rl_ds_dir+str(k**(memory))+'X4Q_table'+str(memory)+'M.npy'
 
 #CNN
@@ -55,7 +56,7 @@ if cnn_train:
 		os.remove(cnn_weights)
 	CNN.trainCNN(cnn_ds_dir,cnn_model,epochs=100)
 	#Check arguments for this method
-	Helpers.saveWeights(cnn_model,weights_dir,'CNN')
+	Helpers.saveWeights(cnn_model,cnn_weights)
 else:
 	print('Loading CNN model...')
 	Helpers.loadWeights(cnn_weights,cnn_model)
@@ -77,7 +78,7 @@ if snn_train:
 		os.remove(snn_weights)
 	SNN.trainModel(csv_snnDS_path,snn_model,epochs=100,batch=4)
 	#Check arguments for this method
-	Helpers.saveWeights(snn_model,weights_dir,'SNN')
+	Helpers.saveWeights(snn_model,snn_weights)
 else:
 	print('Loading SNN model...')
 	Helpers.loadWeights(snn_weights,snn_model)
@@ -89,6 +90,7 @@ if rl_train:
 		os.remove(q_table_file)
 	q_table = RL.get_Q_table(snn_model,memory,k)
 else:
+	pass
 	print('Loading Q table...')
 	q_table = np.load(q_table_file)
 print(q_table)
@@ -102,9 +104,24 @@ if feed_CNN:
 	dump_path = '/home/lizano/Documents/CSA-Loop/CNN/DS/Dump'
 	CNN.feedSNN2CNN(snn_ds_dir,dump_path)
 
+if Test_SNN:
+	Helpers.DataTrasnProbPlot(window,memory,k)
+	SNN.testSNN(snn_model,window,memory,k)
+
+
+
 
 #Control Loop
 if run_loop:
+	bars = ['Fluid','Defective','Crystal']
+	y_pos = np.arange(len(bars))
+	fig_path = './'
+	fig = plt.figure()
+	ax1 = fig.add_subplot(111)
+	ax1.set_yticks(y_pos)
+	ax1.set_yticklabels(bars)
+	ax1.set_xlabel("Time Step")
+
 	img_path = './InitialStates/test.png'
 	img_batch = Helpers.preProcessImg(img_path)
 	state, _ = CNN.runCNN(cnn_model,img_batch)
@@ -125,3 +142,41 @@ if run_loop:
 
 	print(trajectory)
 	print(policy)
+
+	length = len(trajectory)
+	x = range(length)
+	ax1.plot(x, trajectory,'--o')
+	plt.savefig(fig_path+'out.png')
+	plt.clf()
+
+
+
+
+#Constat Trajecotry
+
+if constant_V:
+	length = 10
+	x = range(length+1)
+
+
+	bars = ['Fluid','Defective','Crystal']
+	y_pos = np.arange(len(bars))
+	fig_path = './Results/SNN/plots/trajecotries/'
+	for V in [1,2,3,4]:
+		fig = plt.figure()
+		ax1 = fig.add_subplot(111)
+		ax1.set_yticks(y_pos)
+		ax1.set_yticklabels(bars)
+		ax1.set_xlabel("Time Step")
+		for s in [0,1,2]:
+			fig_name = 'PredTraj-V'+str(V)+'-S0-'+str(s)+'-10steps.png'
+			init = {'V':np.array([V])}
+			for i in range(memory):
+				name = 'S'+str(i-memory)
+				init[name] = np.array([s])
+			print(init)
+			path, pol = SNN.trajectory(memory,snn_model,init,length)
+			print(path)
+			ax1.plot(x, path,'--o')
+		plt.savefig(fig_path+fig_name)
+		plt.clf()

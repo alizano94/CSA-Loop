@@ -408,10 +408,10 @@ class SNN():
 			-trajectory: list with predicted trajectories.
 		'''
 
-		trajectory = []
-		v_traj = []
+		trajectory = [init['S-1']]
+		v_traj = [init['V']]
 		for i in range(length):
-			print(init)
+			#print(init)
 			v_traj.append(init['V'])
 			probs = self.runSNN(model,init)
 			cat_dist = tfp.distributions.Categorical(probs=probs[0])		
@@ -425,3 +425,46 @@ class SNN():
 				past_state = 'S'+str(i-step+1)
 				init[name] = init[past_state]
 		return trajectory, v_traj
+
+	def testSNN(self,model,W,M,k):
+		'''
+		'''
+		h = Helpers()
+
+		size = k**M
+		bars = []
+		volt_lvl = [1,2,3,4]
+
+		for i in range(k):
+			state = 'S'+str(i)
+			bars += [state]
+
+		x_pos = np.arange(len(bars))
+		plt.yticks(color='black')
+		
+		save_path = '/home/lizano/Documents/CSA-Loop/Results/SNN/plots/'
+
+		for V in volt_lvl:
+			for encoded in range(size):
+				state = h.stateDecoder(k,encoded,M)
+				print(state)
+
+				search_dict = {'V':np.array([float(V)])}
+				for i in range(M):
+					name = 'S'+str(i-M)
+					search_dict[name] = np.array([float(state[i])])
+				print(search_dict)
+
+				hist = model.predict(search_dict)
+				print(hist[0])
+
+
+				fig_name = save_path + 'V'+str(V)
+				for i in range(M):
+					name = 'S'+str(i-M)
+					fig_name += '-'+name+str(int(search_dict[name]))
+				fig_name += '.png'
+				plt.xticks(x_pos, bars, color='black')
+				plt.bar(x_pos,hist[0],color='black')
+				plt.savefig(fig_name)
+				plt.clf()

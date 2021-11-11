@@ -548,6 +548,33 @@ plt.bar(x_pos,empirical_prob,color='black')
 #plt.bar(x_pos,probs[0],color='black')
 plt.savefig(fig_name)
 
+def DataTrasnProbPlot(self,train_features,train_labels,fig_path):
+		'''
+		plot the transition probabilities fom the dataset
+		'''
+		dataset = pd.concat([train_features, train_labels.reset_index()],
+					axis=1)
+		dataset.drop(columns=['index'],inplace=True)
 
+		bars = ['Fluid','Defective','Crystal']
+		x_pos = np.arange(len(bars))
+		plt.yticks(color='black')
+		print('Calculating DS transition probabilities...........')
+		for v in [1,2,3,4]:
+			for si in [0,1,2]:
+				example_dict = {'Si': np.array([si]),
+				                'V':np.array([v])}
+				c = [0,0,0]
+				plt.xticks(x_pos, bars, color='black')
+				fig_name = fig_path+'MVRDS-L-S'+str(si)+'-V'+str(v)+'.png'
+				for index, row in dataset.iterrows():
+					if row['V'] == v and row['S-1'] == si:
+						c[row['S0']] += 1
+				plt.bar(x_pos,c,color='red')
+				plt.savefig(fig_name)
+				plt.clf()
+				print(example_dict)
+				print(c)
+				print(sum(c))
 
 

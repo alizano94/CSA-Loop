@@ -32,7 +32,7 @@ def stateDecoder(k,state,m):
 
 k = 3
 m = 1
-state = [3]
+state = [2]
 print("Inital state: ",state)
 num = encode(state,k)
 print("Encoded state: ",num)
