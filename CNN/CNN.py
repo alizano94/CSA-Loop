@@ -220,15 +220,17 @@ class CNN():
 													entry['Path'] = traj_path
 													entry['Step'] = index
 													data = data.append(entry,ignore_index=True)
-		elif DS == 'CNN':
+		else:
 			data = pd.DataFrame()
-			path =	'/home/lizano/Documents/CSA-Loop/CNN/DS/'
+			path =	'./CNN/DS/'
 			for dir_name in ['test/','train/']:
 				new_path = path+dir_name
 				if os.path.isdir(new_path):
+					print('DEBUG')
 					for tag in os.listdir(new_path):
 						real_state = int(tag)
 						new_path = path+dir_name+tag+'/'
+						print(new_path)
 						for filename in os.listdir(new_path):
 							if filename.endswith(".png"):
 								img = new_path+filename

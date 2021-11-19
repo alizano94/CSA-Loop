@@ -24,10 +24,10 @@ cnn_train = False
 snn_train = False
 rl_train = False
 preprocess_snnDS = False
-Test_CNN = False
+Test_CNN = True
 Test_SNN = False
 feed_CNN = False
-run_loop = True
+run_loop = False
 constant_V = False
 
 
@@ -38,7 +38,8 @@ window = 100
 
 #paths
 cnn_ds_dir = './CNN/DS/'
-snn_ds_dir = '/home/lizano/Documents/CSA-Loop/SNN/DS/'
+snn_ds_dir = './SNN/DS/'
+#snn_ds_dir = '/home/lizano/Documents/CSA-Loop/SNN/DS/'
 rl_ds_dir = './RL/'
 csv_snnDS_path = 'Balanced-W'+str(window)+'-M'+str(memory)+'.csv'
 csv_snnDS_path = snn_ds_dir+csv_snnDS_path
@@ -98,7 +99,7 @@ print(q_table)
 #Test Data 
 #Test CNN accuracy.
 if Test_CNN:
-	score = CNN.testCNN(snn_ds_dir,cnn_model,DS='SNN')
+	score = CNN.testCNN(snn_ds_dir,cnn_model,DS = 'CNN')
 	print('Prediction accuracy for CNN :'+str(score))
 if feed_CNN:
 	dump_path = '/home/lizano/Documents/CSA-Loop/CNN/DS/Dump'
@@ -180,3 +181,31 @@ if constant_V:
 			ax1.plot(x, path,'--o')
 		plt.savefig(fig_path+fig_name)
 		plt.clf()
+
+
+
+length = 10
+x = range(length+1)
+
+
+bars = ['Fluid','Defective','Crystal']
+y_pos = np.arange(len(bars))
+fig_path = './'
+for V in [1,2,3,4]:
+	fig = plt.figure()
+	ax1 = fig.add_subplot(111)
+	ax1.set_yticks(y_pos)
+	ax1.set_yticklabels(bars)
+	ax1.set_xlabel("Time Step")
+	for s in [0,1,2]:
+		fig_name = 'PredTraj-V'+str(V)+'-S0-'+str(s)+'-10steps.png'
+		init = {'V':np.array([V])}
+		for i in range(memory):
+			name = 'S'+str(i-memory)
+			init[name] = np.array([s])
+		print(init)
+		path, pol = SNN.trajectory(memory,snn_model,init,length)
+		print(path)
+		ax1.plot(x, path,'--o')
+	plt.savefig(fig_path+fig_name)
+	plt.clf()
