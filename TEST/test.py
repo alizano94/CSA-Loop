@@ -38,7 +38,7 @@ print(img_name)
 
 #Creating Clusters
 k = 2
-clusters = KMeans(k)
+clusters = KMeans(k,algorithm)
 clusters.fit(img_features)
 
 image_cluster = pd.DataFrame(img_name,columns=['image'])
