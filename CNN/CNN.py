@@ -23,39 +23,6 @@ class CNN():
 	def __init__(self):
 		pass
 
-	def feedSNN2CNN(self,path,dump_path):
-		'''
-		Method that feed CNN DS with data from SNN
-		'''
-		for v_dir in os.listdir(path):
-			v_path = path+str(v_dir)
-			if os.path.isdir(v_path):
-				V = v_dir.replace('V','')
-				for sampling_dir in os.listdir(v_path):
-					sts_path = v_path+'/'+str(sampling_dir)
-					if os.path.isdir(sts_path):
-						sts_step = sampling_dir.replace('s','')
-						for traj_dir in os.listdir(sts_path):
-							traj_path = sts_path+'/'+str(traj_dir)
-							T = traj_dir.replace('T','')
-							if os.path.isdir(traj_path):
-								csv_name = 'V'+str(V)+'-'+str(sts_step)+'s-T'+str(T)+'.csv'
-								csv_path = traj_path+'/'+csv_name
-								if os.path.exists(csv_path):
-									data = pd.read_csv(csv_path)
-									plots_dir = traj_path+'/plots/'
-									for index,row in data.iterrows():
-										image_name = 'V'+str(V)+'-T'+str(T)+'-'+str(index)+'step-'+str(sts_step)+'s.png'
-										image_name = plots_dir+image_name
-										if row['S_param'] == 0:
-											os.system('cp -r '+image_name+' '+dump_path+'/0/')
-										elif row['S_param'] == 1:
-											os.system('cp -r '+image_name+' '+dump_path+'/1/')
-										else:
-											os.system('cp -r '+image_name+' '+dump_path+'/2/')
-
-
-
 
 	def createCNN(self,IMG_H=212,IMG_W=212,chan=1,summary=False):
 		'''
@@ -150,6 +117,7 @@ class CNN():
 
 		total_train = num_crystal_train + num_fluid_train + num_defective_train
 		total_test = num_crystal_test + num_fluid_test + num_defective_test
+		
 		
 		history = model.fit(
 			train_data_gen,

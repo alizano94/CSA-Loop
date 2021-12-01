@@ -63,10 +63,10 @@ zipp = "==3.6.0"
 Keras-Preprocessing = "==1.1.2"
 Markdown = "==3.3.4"
 Werkzeug = "==2.0.1"
-Cycler = "==0.10.0"
 Pillow = "==8.3.2"
 ipython = "*"
 tqdm = "*"
+cycler = "==0.10.0"
 
 [requires]
 python_version = "3.6"
